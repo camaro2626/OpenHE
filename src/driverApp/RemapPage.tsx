@@ -9,7 +9,7 @@ import { useKeycodeGroups } from './KeycodePicker';
 import { SaveBar } from './SaveBar';
 
 export function keyLabel(driver: KeyboardDriver, value: UiKeycode, fnLayer: boolean): string {
-  if (value === 0) return fnLayer ? '▽' : '—';
+  if (value === 0) return fnLayer && driver.transparentKeycode === 0 ? '▽' : '—';
   const own = driver.keycodeLabel?.(value);
   if (own) return own;
   const label = remapLabel(value);
@@ -119,16 +119,19 @@ export function RemapPage({
             )}
             {selected !== null && (
               <span className="drv-toolbar-actions">
-                {fnLayer && (
+                {fnLayer && driver.transparentKeycode !== undefined && (
                   <button
                     type="button"
                     className="ghost-button"
-                    onClick={() => setDraft(d => d && d.map((v, i) => (i === selected ? 0 : v)))}
+                    onClick={() => {
+                      const through = driver.transparentKeycode!;
+                      setDraft(d => d && d.map((v, i) => (i === selected ? through : v)));
+                    }}
                   >
                     Pass through
                   </button>
                 )}
-                {!fnLayer && (
+                {!(fnLayer && driver.transparentKeycode === 0) && (
                   <button
                     type="button"
                     className="ghost-button"

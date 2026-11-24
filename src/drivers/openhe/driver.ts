@@ -87,6 +87,8 @@ export function isOpenHEDevice(device: HidDeviceLike): boolean {
 
 export class OpenHEDriver implements KeyboardDriver {
   readonly id = 'openhe' as const;
+  /** libhmk KC_TRANSPARENT; an empty slot (KC_NO) does nothing. */
+  readonly transparentKeycode = uiNative(0x01);
   /** Full travel of the switches, mm. */
   readonly travelMm: number;
   readonly capabilities: DriverCapabilities;
@@ -426,7 +428,7 @@ export class OpenHEDriver implements KeyboardDriver {
 
   extraKeycodes(): Array<{ value: UiKeycode; label: string }> {
     const out: Array<{ value: UiKeycode; label: string }> = [
-      { value: uiNative(0x01), label: '▽ Transparent' }
+      { value: this.transparentKeycode, label: '▽ Transparent' }
     ];
     for (let l = 1; l < this.metadata.numLayers; l++) {
       out.push({ value: uiMomentaryLayer(l), label: `Layer ${l} (hold)` });

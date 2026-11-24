@@ -180,6 +180,8 @@ export function hallWrites(spec: RySpec, family: Family, revision: number | null
 
 export class RongyuanDriver implements KeyboardDriver {
   readonly id = 'rongyuan' as const;
+  /** An empty Fn-layer slot passes through to the base layer. */
+  readonly transparentKeycode = 0;
   readonly capabilities: DriverCapabilities;
   layout: BoardLayout;
   /** Matrix slot of each layout key. */

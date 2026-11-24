@@ -419,6 +419,12 @@ export interface KeyboardDriver {
   reboot?(): Promise<void>;
   enterBootloader?(): Promise<void>;
 
+  /**
+   * The code that falls through to the layer below, on layers above the base
+   * one. RongYuan: an empty slot (0). OpenHE firmware and Sparklink: a code of
+   * its own, and an empty slot does nothing. Absent: no fall-through.
+   */
+  readonly transparentKeycode?: UiKeycode;
   /** Label for a keycode only this board knows (driver-native codes). */
   keycodeLabel?(value: UiKeycode): string | null;
   /** Whether the board can store this keycode. */

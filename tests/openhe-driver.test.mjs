@@ -345,6 +345,13 @@ test('a rejected command surfaces as an error', async () => {
   await assert.rejects(d.getKeymap(0, 9), /rejected command 128/)
 })
 
+test('transparent is KC_TRANSPARENT, not an empty slot', async () => {
+  const { transport } = fakeOpenHE()
+  const d = await OpenHEDriver.connect(transport, usb)
+  assert.equal(kc.uiToHmk(d.transparentKeycode), 0x01)
+  assert.equal(kc.uiToHmk(0), 0x00)
+})
+
 test('every firmware keycode maps to a UI keycode and back', () => {
   for (let code = 0; code <= 0xd4; code++) {
     if (code > 0x9f && code < 0xc0) continue

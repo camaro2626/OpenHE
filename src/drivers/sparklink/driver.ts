@@ -25,7 +25,7 @@ import {
   type TravelSample
 } from '../types';
 import type { UiKeycode } from '../keycodes';
-import { decodeUiKeycode } from '../keycodes';
+import { decodeUiKeycode, uiNative } from '../keycodes';
 import { isSparklinkId, SPARKLINK_IDS } from './ids';
 import { slExtraKeycodes, slName, slToUi, uiToSl } from './keycodes';
 import {
@@ -59,6 +59,7 @@ import {
   setKeyRow,
   setPerformance,
   SL_LAYERS,
+  SL_TRANSPARENT,
   SL_MAX_ROWS,
   SL_USAGE,
   SL_USAGE_PAGE,
@@ -92,6 +93,8 @@ type Position = { row: number; col: number };
 
 export class SparklinkDriver implements KeyboardDriver {
   readonly id = 'sparklink' as const;
+  /** 0x0001 passes through; an empty slot (0x0000) does nothing. */
+  readonly transparentKeycode = uiNative(SL_TRANSPARENT);
   readonly capabilities: DriverCapabilities;
   private readonly rateCodes: number[];
   /** Raw performance per layout key, for the fields OpenHE does not edit. */
@@ -319,6 +322,7 @@ export class SparklinkDriver implements KeyboardDriver {
     const d = decodeUiKeycode(value);
     if (d.type === 'layer') return `Fn${d.layer}`;
     if (d.type !== 'native') return null;
+    if (d.code === SL_TRANSPARENT) return '▽';
     return slName(d.code);
   }
 

@@ -70,7 +70,7 @@ export function slExtraKeycodes(): Array<{ value: UiKeycode; label: string }> {
     if (group === 'basic' || group === 'media' || group === 'mouse' || code === 0) continue;
     // gamepad codes only mean something with the board in gamepad mode; macro keys need macros
     if (group === 'game' || group === 'macro') continue;
-    out.push({ value: slToUi(code), label: name });
+    out.push({ value: slToUi(code), label: code === 1 ? '▽ Transparent' : name });
   }
   return out;
 }

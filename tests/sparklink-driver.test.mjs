@@ -171,6 +171,10 @@ test('keymap: rows of 21 codes, only changed rows written, then saved', async ()
   cfg[0].keys[0][1][0] = 0xf301
   const again = await d.getKeymap(0, 0)
   assert.equal(d.keycodeLabel(again[15]), 'Color')
+  // transparent is its own code here; an empty slot does nothing
+  assert.equal(d.transparentKeycode, (0x7f << 24) | 1)
+  assert.equal(d.keycodeLabel(d.transparentKeycode), '▽')
+  assert.ok(d.extraKeycodes().some(k => k.value === d.transparentKeycode && k.label === '▽ Transparent'))
   await d.setKeymap(0, 0, again)
   assert.equal(state.writes.length, 1)
   // Fn layer and another profile: the board switches profile first
