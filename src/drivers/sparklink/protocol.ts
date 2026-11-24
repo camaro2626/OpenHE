@@ -54,6 +54,8 @@ export const GlobalCmd = {
   REPORT_RATE: 0x05,
   CALIBRATION: 0x06,
   AXIS_LIBRARY: 0x07,
+  LIGHT_AREAS: 0x08,
+  DOUBLE_LIGHTING: 0x0a,
   RT_PRECISION: 0x0c
 } as const;
 /** Read list / read / write, the third byte of global reads and writes. */
@@ -298,6 +300,67 @@ export const SL_MOUSE: Readonly<Record<number, number>> = {
   0x4500: 4
 };
 
+// ------------------------------------------------------------ lighting
+
+/** Light areas: 0 the keys, 1.. decorative strips. */
+export const lightAreas = () => packet([Group.GLOBAL, GlobalCmd.LIGHT_AREAS, 0]);
+export function parseLightAreas(d: Uint8Array): number[] {
+  const n = Math.min(d[3], 14);
+  return Array.from({ length: n }, (_, i) => d[4 + i * 4]);
+}
+/** Key lighting on two LED rows (upper and lower) switched separately. */
+export const doubleLighting = () => packet([Group.GLOBAL, GlobalCmd.DOUBLE_LIGHTING, 0]);
+
+export const LightCmd = { READ: 0x01, WRITE: 0x02 } as const;
+export const LightConfig = { BASE: 0x00, PALETTE: 0x01 } as const;
+/** Brightness and speed run 0..100 (confirmed on an SU66 Max by device-hub). */
+export const LIGHT_MAX = 100;
+/** `open` on keys with two LED rows: 1 lower only, 2 upper only, 3 both. */
+export const LIGHT_OPEN_BOTH = 3;
+
+export type SlLightBase = {
+  open: number;
+  /** 0 static, 1..15 effects, 16 per-key colours, 17..19 reactive. */
+  mode: number;
+  brightness: number;
+  speed: number;
+  direction: number;
+  /** Palette slot; 0 is the firmware's rainbow. */
+  colorSlot: number;
+};
+
+export const getLightBase = (area: number) =>
+  packet([Group.LIGHTING, LightCmd.READ, area, LightConfig.BASE]);
+export const parseLightBase = (d: Uint8Array): SlLightBase => ({
+  open: d[4],
+  mode: d[5],
+  brightness: d[6],
+  speed: d[7],
+  direction: d[8],
+  colorSlot: d[9]
+});
+export const setLightBase = (area: number, b: SlLightBase) =>
+  packet([
+    Group.LIGHTING,
+    LightCmd.WRITE,
+    area,
+    LightConfig.BASE,
+    b.open,
+    b.mode,
+    Math.min(b.brightness, LIGHT_MAX),
+    Math.min(b.speed, LIGHT_MAX),
+    b.direction ? 1 : 0,
+    b.colorSlot & 7
+  ]);
+
+/** Eight palette colours, B G R and a fourth byte kept as read. */
+export const getPalette = (area: number) =>
+  packet([Group.LIGHTING, LightCmd.READ, area, LightConfig.PALETTE]);
+export const parsePalette = (d: Uint8Array): number[][] =>
+  Array.from({ length: 8 }, (_, i) => Array.from(d.subarray(4 + i * 4, 8 + i * 4)));
+export const setPalette = (area: number, colors: readonly number[][]) =>
+  packet([Group.LIGHTING, LightCmd.WRITE, area, LightConfig.PALETTE, ...colors.flat()]);
+
 // ------------------------------------------------------------ advanced keys
 
 /** Advanced-key modes (protocol-keyboard-v2 HigherKeyMode). */
@@ -331,13 +394,22 @@ export type SlHigherKey =
   | { mode: typeof HK.MT; codes: [number, number]; timeMs: number }
   | { mode: typeof HK.TGL; code: number; timeMs: number }
   | {
+      mode: typeof HK.DKS;
+      codes: [number, number, number, number];
+      /** Per keycode, the trps bitmask (see `DKS_BIT`). */
+      trps: [number, number, number, number];
+      /** First point and bottom-out point, µm. */
+      pressUm: number;
+      bottomUm: number;
+    }
+  | {
       mode: typeof HK.SOCD;
       partner: { row: number; col: number };
       codes: [number, number];
       delayMs: number;
       rule: number;
     }
-  /** Anything OpenHE does not edit (DKS, MPT, END, RS, MDS, Turbo, newer SOCD). */
+  /** Anything OpenHE does not edit (MPT, END, RS, MDS, Turbo, newer SOCD). */
   | { mode: number; other: true };
 
 export function parseHigherKey(d: Uint8Array): SlHigherKey {
@@ -349,6 +421,14 @@ export function parseHigherKey(d: Uint8Array): SlHigherKey {
       return { mode, codes: [u16(d, 5), u16(d, 7)], timeMs: u16(d, 9) };
     case HK.TGL:
       return { mode, code: u16(d, 5), timeMs: u16(d, 7) };
+    case HK.DKS:
+      return {
+        mode,
+        codes: [u16(d, 5), u16(d, 7), u16(d, 9), u16(d, 11)],
+        trps: [d[13], d[14], d[15], d[16]],
+        pressUm: u16(d, 17),
+        bottomUm: u16(d, 19)
+      };
     case HK.SOCD:
       return {
         mode,
@@ -376,6 +456,40 @@ export const setMt = (row: number, col: number, codes: [number, number], timeMs:
 
 export const setTgl = (row: number, col: number, code: number, timeMs: number) =>
   packet([Group.HIGHER_KEY, HK_WRITE, row, col, HK.TGL, ...le16(code), ...le16(timeMs)]);
+
+/**
+ * DKS trps byte, one per keycode. The stroke has four points: past the first
+ * point, bottom-out, release from bottom-out (the same depth, going up) and
+ * back past the first point. Low nibble is the way down, high nibble the way
+ * up (keyboard-docs v2 higherKey). An event bit taps the key at that point; a
+ * segment bit keeps it held from one point to the next. Bottom-out is held
+ * with both its halves set, as the vendor app does.
+ */
+export const DKS_BIT = {
+  TAP: [0x01, 0x04, 0x20, 0x80],
+  /** Held from point i to point i + 1. */
+  HOLD: [0x02, 0x08 | 0x10, 0x40]
+} as const;
+
+export const setDks = (
+  row: number,
+  col: number,
+  codes: readonly number[],
+  trps: readonly number[],
+  pressUm: number,
+  bottomUm: number
+) =>
+  packet([
+    Group.HIGHER_KEY,
+    HK_WRITE,
+    row,
+    col,
+    HK.DKS,
+    ...[0, 1, 2, 3].flatMap(i => le16(codes[i] ?? 0)),
+    ...[0, 1, 2, 3].map(i => trps[i] ?? 0),
+    ...le16(pressUm),
+    ...le16(bottomUm)
+  ]);
 
 /** Both keys of a SOCD pair, each carrying the other; the rule mirrors for the second key. */
 export function setSocdPair(

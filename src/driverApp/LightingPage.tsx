@@ -1,5 +1,5 @@
 /**
- * Lighting for boards whose driver has `lightingInfo` (RongYuan): effect,
+ * Lighting for boards whose driver has `lightingInfo` (RongYuan, Sparklink): effect,
  * brightness, speed, direction and colour for the backlight and the edge
  * light, in OpenAula's RGB page layout. Each change is written to the board
  * shortly after you stop dragging (lighting is stored in flash).
@@ -198,7 +198,9 @@ export function LightingPage({ driver }: { driver: KeyboardDriver }) {
               <label>
                 Brightness{' '}
                 <strong>
-                  {setting.brightness} / {zoneInfo.brightnessMax}
+                  {zoneInfo.percent
+                    ? `${setting.brightness}%`
+                    : `${setting.brightness} / ${zoneInfo.brightnessMax}`}
                 </strong>
                 <input
                   aria-label="Brightness"
@@ -213,7 +215,9 @@ export function LightingPage({ driver }: { driver: KeyboardDriver }) {
                 <label>
                   Speed{' '}
                   <strong>
-                    {setting.speed + 1} / {speedMax + 1}
+                    {zoneInfo.percent
+                      ? `${setting.speed}%`
+                      : `${setting.speed + 1} / ${speedMax + 1}`}
                   </strong>
                   <input
                     aria-label="Speed"

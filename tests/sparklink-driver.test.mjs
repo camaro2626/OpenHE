@@ -52,6 +52,12 @@ function fakeBoard({ magnetic = true, rows = [15, 15, 14, 14, 10], profiles = 4,
     }
   })
   const route = new Map()
+  // lighting: keys (area 0) on two LED rows, and an edge strip (area 1)
+  const light = {
+    0: { base: [3, 4, 80, 50, 0, 2], palette: Array.from({ length: 8 }, (_, i) => [i * 10, 0, 255, 255]) },
+    1: { base: [1, 1, 40, 20, 1, 0], palette: Array.from({ length: 8 }, () => [0, 255, 0, 255]) }
+  }
+  state.light = light
   const reply = req => {
     const out = new Uint8Array(64)
     out[0] = req[0]; out[1] = req[1]
@@ -107,6 +113,24 @@ function fakeBoard({ magnetic = true, rows = [15, 15, 14, 14, 10], profiles = 4,
         else { state.rate = req[3]; out[3] = req[3] }
         break
       case 0x020c: out[3] = 10; break
+      case 0x0208: out[3] = 2; out.set([0, 87, 6, 21, 1, 12, 1, 12], 4); break
+      case 0x020a: out[3] = 1; break
+      case 0x0501: {
+        out[2] = req[2]; out[3] = req[3]
+        const a = light[req[2]]
+        if (!a) { out[1] = 0xff; break }
+        if (req[3] === 0) out.set(a.base, 4)
+        else if (req[3] === 1) out.set(a.palette.flat(), 4)
+        break
+      }
+      case 0x0502: {
+        const a = light[req[2]]
+        if (req[3] === 0) a.base = [...req.subarray(4, 10)]
+        else if (req[3] === 1) a.palette = Array.from({ length: 8 }, (_, i) => [...req.subarray(4 + i * 4, 8 + i * 4)])
+        state.writes.push(['light', req[2], req[3]])
+        out[2] = req[2]; out[3] = req[3]
+        break
+      }
       case 0x020e: out[3] = 16; out.set(le(960), 4); break
       case 0x0701: out[2] = req[2]; out.set(macros[req[2]].header, 3); break
       case 0x0702: macros[req[2]].header = [...req.subarray(3, 9)]; state.writes.push(['macroHeader', req[2]]); out[2] = req[2]; break
@@ -295,9 +319,9 @@ test('replies are matched on group and sub-command; stray reports are skipped', 
 test('advanced keys: SOCD pairs, tap-hold, toggle; vendor-only kinds left alone', async () => {
   const { transport, state, cfg } = fakeBoard()
   const d = await SparklinkDriver.connect(transport, usb)
-  assert.deepEqual(d.capabilities.advancedKeys, ['nullBind', 'tapHold', 'toggle', 'macro'])
-  // a DKS someone set in the vendor app on key (1,5)
-  cfg[0].hk.set('1:5', [6, 2, 1, 5, 1, 0x14, 0, 0x1a, 0, 0, 0, 0, 0, 31, 31, 31, 31])
+  assert.deepEqual(d.capabilities.advancedKeys, ['nullBind', 'dynamicKeystroke', 'tapHold', 'toggle', 'macro'])
+  // a multi-point trigger someone set in the vendor app on key (1,5)
+  cfg[0].hk.set('1:5', [6, 2, 1, 5, 2, 0x14, 0, 0x1a, 0, 0x08, 0, 0xe8, 3, 0xd0, 7, 0xb8, 0x0b])
   assert.deepEqual(await d.getAdvancedKeys(0), [])
   // A = row 2 col 1, D = row 2 col 3 in the fake's layout (key indices 31 and 33)
   const keys = [
@@ -319,14 +343,14 @@ test('advanced keys: SOCD pairs, tap-hold, toggle; vendor-only kinds left alone'
   const tgl = rec(0, 2)
   assert.deepEqual([tgl[4], tgl[5] | (tgl[6] << 8), tgl[7] | (tgl[8] << 8)], [4, 0x1e, 300])
   assert.ok(state.saves.includes(0x05))
-  assert.ok(cfg[0].hk.has('1:5')) // the vendor's DKS survives
+  assert.ok(cfg[0].hk.has('1:5')) // the vendor's MPT survives
   // read back exactly what was written
   const back = await d.getAdvancedKeys(0)
   const byKind = k => back.find(x => x.kind === k)
   assert.deepEqual(byKind('nullBind'), keys[0])
   assert.deepEqual(byKind('tapHold'), keys[1])
   assert.deepEqual(byKind('toggle'), keys[2])
-  // unchanged: nothing written; removing: cleared, the DKS still there
+  // unchanged: nothing written; removing: cleared, the MPT still there
   const before = state.writes.length
   await d.setAdvancedKeys(0, back)
   assert.equal(state.writes.length, before)
@@ -384,4 +408,85 @@ test('macros: 16 shared slots, played by M0..M15 keycodes on any layer', async (
     d.setAdvancedKeys(0, [{ ...keys[0], steps: Array(61).fill(steps[0]) }]),
     /at most 60/
   )
+})
+
+test('DKS: trps bits per keycode, first and bottom-out points in micrometres', async () => {
+  const { transport, state, cfg } = fakeBoard()
+  const d = await SparklinkDriver.connect(transport, usb)
+  const { trpsToActions, actionsToTrps } = await bundle('src/drivers/sparklink/driver.ts')
+  // event bits tap, segment bits hold; the vendor's 31 is held to the top of the release
+  assert.deepEqual(trpsToActions(0x01), ['tap', 'hold', 'hold', 'hold'])
+  assert.deepEqual(trpsToActions(31), ['press', 'hold', 'release', 'hold'])
+  assert.deepEqual(trpsToActions(255), ['press', 'hold', 'hold', 'release'])
+  assert.deepEqual(trpsToActions(0x02 | 0x40), ['press', 'release', 'press', 'release'])
+  assert.deepEqual(trpsToActions(0x04 | 0x80), ['hold', 'tap', 'hold', 'tap'])
+  assert.equal(actionsToTrps(['press', 'hold', 'release', 'hold']), 0x02 | 0x18)
+  assert.equal(actionsToTrps(['press', 'hold', 'hold', 'hold']), 0x02 | 0x18 | 0x40)
+  assert.equal(actionsToTrps(['hold', 'tap', 'hold', 'tap']), 0x04 | 0x80)
+  for (const t of [0x01, 0x1a, 0x5a, 0x84, 0x42]) assert.equal(actionsToTrps(trpsToActions(t)), t)
+
+  const dks = {
+    kind: 'dynamicKeystroke', layer: 0, key: 16, // row 1 col 1
+    keycodes: [0x04, 0x05, 0, 0],
+    actions: [['press', 'hold', 'release', 'hold'], ['hold', 'tap', 'hold', 'tap'], ['hold', 'hold', 'hold', 'hold'], ['hold', 'hold', 'hold', 'hold']],
+    bottomOutMm: 3.2,
+    pressMm: 0.8
+  }
+  await d.setAdvancedKeys(0, [dks])
+  const rec = cfg[0].hk.get('1:1')
+  assert.equal(rec[4], 1)
+  assert.deepEqual([rec[5] | (rec[6] << 8), rec[7] | (rec[8] << 8), rec[9], rec[11]], [0x04, 0x05, 0, 0])
+  assert.deepEqual(rec.slice(13, 17), [0x1a, 0x84, 0, 0])
+  assert.deepEqual([rec[17] | (rec[18] << 8), rec[19] | (rec[20] << 8)], [800, 3200])
+  assert.ok(state.saves.includes(0x05))
+  const back = await d.getAdvancedKeys(0)
+  assert.deepEqual(back, [dks])
+  const before = state.writes.length
+  await d.setAdvancedKeys(0, back)
+  assert.equal(state.writes.length, before)
+  await assert.rejects(d.setAdvancedKeys(0, [{ ...dks, pressMm: 3.5 }]), /first point/)
+})
+
+test('lighting: effect, 0-100 brightness and speed, palette colour, on/off, edge strip', async () => {
+  const { transport, state } = fakeBoard()
+  const d = await SparklinkDriver.connect(transport, usb)
+  assert.equal(d.capabilities.rgb, true)
+  const info = d.lightingInfo()
+  assert.equal(info.backlight.brightnessMax, 100)
+  assert.ok(info.side)
+  assert.equal(info.backlight.effects.find(e => e.mode === 0).label, 'Static')
+  const s = await d.getLighting()
+  // slot 2 of the palette (B=20, G=0, R=255) is the colour
+  assert.deepEqual(s.backlight, { mode: 4, speed: 50, brightness: 80, option: 0, rainbow: false, color: 0xff0014 })
+  assert.equal(s.backlightOff, false)
+  assert.deepEqual(s.side, { mode: 1, speed: 20, brightness: 40, option: 1, rainbow: true, color: 0x00ff00 })
+
+  // a new colour goes into the selected slot; the rest of the palette is untouched
+  await d.setBacklight({ ...s.backlight, color: 0x123456, brightness: 100, mode: 10, option: 1 })
+  assert.deepEqual(state.light[0].palette[2], [0x56, 0x34, 0x12, 255])
+  assert.deepEqual(state.light[0].palette[3], [30, 0, 255, 255])
+  assert.deepEqual(state.light[0].base, [3, 10, 100, 50, 1, 2])
+  assert.ok(state.saves.includes(0x03))
+  // rainbow: slot 0, palette not written
+  const writes = state.writes.length
+  await d.setBacklight({ ...s.backlight, rainbow: true })
+  assert.equal(state.light[0].base[5], 0)
+  assert.deepEqual(state.writes.slice(writes), [['light', 0, 0]])
+  // picking a colour from rainbow uses slot 1
+  await d.setBacklight({ ...s.backlight, rainbow: false, color: 0xff0000 })
+  assert.equal(state.light[0].base[5], 1)
+  assert.deepEqual(state.light[0].palette[1], [0, 0, 255, 255])
+
+  // off and back on: both LED rows (3) on the keys, plain on (1) for the strip
+  await d.setLightsOff({ backlightOff: true, sideOff: true })
+  assert.equal(state.light[0].base[0], 0)
+  assert.equal(state.light[1].base[0], 0)
+  assert.equal((await d.getLighting()).backlightOff, true)
+  await d.setLightsOff({ backlightOff: false, sideOff: false })
+  assert.equal(state.light[0].base[0], 3)
+  assert.equal(state.light[1].base[0], 1)
+  // the effect was kept
+  assert.equal(state.light[0].base[1], 4)
+  await d.setSideLight({ ...s.side, speed: 90 })
+  assert.equal(state.light[1].base[3], 90)
 })

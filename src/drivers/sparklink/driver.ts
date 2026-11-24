@@ -20,7 +20,13 @@ import {
   type DeviceOptions,
   type DriverCapabilities,
   type AdvancedKey,
+  type DksAction,
   type KeyActuation,
+  type LightEffect,
+  type LightingInfo,
+  type LightingState,
+  type LightSetting,
+  type LightZone,
   type MacroStep,
   type KeyboardDriver,
   type LayoutKey,
@@ -70,8 +76,22 @@ import {
   getHigherKey,
   HK,
   parseHigherKey,
+  DKS_BIT,
+  setDks,
   setMt,
   setSocdPair,
+  getLightBase,
+  getPalette,
+  lightAreas,
+  doubleLighting,
+  LIGHT_MAX,
+  LIGHT_OPEN_BOTH,
+  parseLightAreas,
+  parseLightBase,
+  parsePalette,
+  setLightBase,
+  setPalette,
+  type SlLightBase,
   setTgl,
   SOCD_RULE,
   type SlHigherKey,
@@ -137,7 +157,9 @@ export class SparklinkDriver implements KeyboardDriver {
     profiles: number,
     rateCodes: number[],
     travelMm: number,
-    stepMm: number
+    stepMm: number,
+    /** Light areas and whether the keys have two LED rows; null without lighting. */
+    private readonly light: { areas: number[]; double: boolean } | null = null
   ) {
     this.rateCodes = rateCodes;
     this.capabilities = {
@@ -149,20 +171,21 @@ export class SparklinkDriver implements KeyboardDriver {
       rapidTrigger: true,
       rapidTriggerSplit: true,
       continuousRapidTrigger: true,
-      advancedKeys: ['nullBind', 'tapHold', 'toggle', 'macro'],
+      advancedKeys: ['nullBind', 'dynamicKeystroke', 'tapHold', 'toggle', 'macro'],
       maxAdvancedKeys: layout.keys.length,
       advancedKeyLimits: {
-        baseLayerOnly: ['nullBind', 'tapHold', 'toggle'],
+        baseLayerOnly: ['nullBind', 'dynamicKeystroke', 'tapHold', 'toggle'],
+        dksPressPoint: true,
         nullBindBehaviors: ['last', 'primary', 'secondary', 'neutral'],
         nullBindBottomOut: false,
         tapHoldTermMs: { min: 50, max: 2000, step: 10 },
         holdOnOtherKeyPress: false
       },
-      dynamicKeystrokeBindings: 0,
+      dynamicKeystrokeBindings: 4,
       macros: true,
       travelStream: true,
       calibration: false,
-      rgb: false,
+      rgb: light !== null,
       gamepad: false,
       pollingRates: rateCodes.map(c => REPORT_RATES_HZ[c]).filter(Boolean),
       releasePoint: true,
@@ -234,6 +257,16 @@ export class SparklinkDriver implements KeyboardDriver {
         ? mm(p.axisRangeMax)
         : DEFAULT_TRAVEL_MM;
     }, DEFAULT_TRAVEL_MM);
+    const light = features.rgb
+      ? await optional(async () => {
+          const areas = parseLightAreas(await ask(lightAreas()));
+          if (!areas.includes(0)) return null;
+          const double = await optional(async () => (await ask(doubleLighting()))[3] === 1, false);
+          // the base read must work before lighting is offered
+          await ask(getLightBase(0));
+          return { areas, double };
+        }, null)
+      : null;
 
     return new SparklinkDriver(
       transport,
@@ -252,7 +285,8 @@ export class SparklinkDriver implements KeyboardDriver {
       Math.max(1, Math.min(profiles || 1, 8)),
       rateCodes.filter(c => c < REPORT_RATES_HZ.length),
       travelMm,
-      stepMm
+      stepMm,
+      light
     );
   }
 
@@ -401,7 +435,7 @@ export class SparklinkDriver implements KeyboardDriver {
     return values;
   }
 
-  /** SOCD, tap-hold (MT) and toggle (TGL); other kinds set elsewhere are left alone. */
+  /** SOCD, DKS, tap-hold (MT) and toggle (TGL); other kinds set elsewhere are left alone. */
   async getAdvancedKeys(profile: number): Promise<AdvancedKey[]> {
     this.hkCache = null;
     const hks = await this.readHigherKeys(profile);
@@ -427,6 +461,16 @@ export class SparklinkDriver implements KeyboardDriver {
           keycode: slToUi(hk.code),
           tappingTermMs: hk.timeMs
         });
+      else if (hk.mode === HK.DKS)
+        out.push({
+          kind: 'dynamicKeystroke',
+          layer: 0,
+          key,
+          keycodes: hk.codes.map(slToUi),
+          actions: hk.trps.map(trpsToActions),
+          bottomOutMm: hk.bottomUm / 1000,
+          pressMm: hk.pressUm / 1000
+        });
       else if (hk.mode === HK.SOCD) {
         const partner = indexOf.get(`${hk.partner.row}:${hk.partner.col}`);
         // one entry per pair, from the first key in layout order
@@ -449,10 +493,6 @@ export class SparklinkDriver implements KeyboardDriver {
     await this.setMacros(all.filter(k => k.kind === 'macro'));
     const keys = all.filter(k => k.kind !== 'macro');
     for (const ak of keys) {
-      if (ak.kind === 'dynamicKeystroke')
-        throw new DriverError(
-          'This board does not take that kind of advanced key from OpenHE yet.'
-        );
       if (ak.layer !== 0)
         throw new DriverError('Advanced keys work on the base layer on this board.');
       if (ak.kind === 'nullBind' && ak.behavior === 'distance')
@@ -480,6 +520,30 @@ export class SparklinkDriver implements KeyboardDriver {
         codes[MT_TAP] = code(ak.tap);
         codes[1 - MT_TAP] = code(ak.hold);
         next[ak.key] = { mode: HK.MT, codes, timeMs: Math.round(ak.tappingTermMs) };
+      } else if (ak.kind === 'dynamicKeystroke') {
+        const bottomUm = Math.round(ak.bottomOutMm * 1000);
+        const was = current[ak.key];
+        const pressUm = Math.round(
+          (ak.pressMm ?? (was.mode === HK.DKS && 'pressUm' in was ? was.pressUm / 1000 : 0.5)) *
+            1000
+        );
+        if (pressUm >= bottomUm)
+          throw new DriverError('A dynamic keystroke’s first point must be above its bottom-out.');
+        // same key order as parseHigherKey, so unchanged keys compare equal
+        next[ak.key] = {
+          mode: HK.DKS,
+          codes: [0, 1, 2, 3].map(i => (ak.keycodes[i] ? code(ak.keycodes[i]) : 0)) as [
+            number,
+            number,
+            number,
+            number
+          ],
+          trps: [0, 1, 2, 3].map(i =>
+            ak.keycodes[i] && ak.actions[i] ? actionsToTrps(ak.actions[i]) : 0
+          ) as [number, number, number, number],
+          pressUm,
+          bottomUm
+        };
       } else if (ak.kind === 'toggle') {
         next[ak.key] = {
           mode: HK.TGL,
@@ -525,6 +589,8 @@ export class SparklinkDriver implements KeyboardDriver {
         await this.ask(setMt(row, col, hk.codes, hk.timeMs));
       else if (hk.mode === HK.TGL && 'code' in hk)
         await this.ask(setTgl(row, col, hk.code, hk.timeMs));
+      else if (hk.mode === HK.DKS && 'trps' in hk)
+        await this.ask(setDks(row, col, hk.codes, hk.trps, hk.pressUm, hk.bottomUm));
       else if (hk.mode === HK.SOCD && 'partner' in hk) {
         const other = this.positions.findIndex(
           p => p.row === hk.partner.row && p.col === hk.partner.col
@@ -543,6 +609,95 @@ export class SparklinkDriver implements KeyboardDriver {
     }
     if (wrote) await this.ask(save(Area.HIGHER_KEY));
     this.hkCache = { profile, values: next };
+  }
+
+  // ------------------------------------------------------------ lighting
+
+  lightingInfo(): LightingInfo {
+    const zone: LightZone = { effects: SL_EFFECTS, brightnessMax: LIGHT_MAX, percent: true };
+    return {
+      backlight: zone,
+      ...(this.light?.areas.includes(1) ? { side: zone } : {}),
+      canSwitchOff: true
+    };
+  }
+
+  private async readLight(area: number) {
+    const base = parseLightBase(await this.ask(getLightBase(area)));
+    const palette = parsePalette(await this.ask(getPalette(area)));
+    return { base, palette };
+  }
+
+  async getLighting(): Promise<LightingState> {
+    if (!this.light) throw new DriverError(`${this.info.name} has no lighting OpenHE can set.`);
+    const keys = await this.readLight(0);
+    const state: LightingState = {
+      backlight: toLightSetting(keys.base, keys.palette),
+      backlightOff: keys.base.open === 0
+    };
+    if (this.light.areas.includes(1)) {
+      const side = await this.readLight(1);
+      state.side = toLightSetting(side.base, side.palette);
+      state.sideOff = side.base.open === 0;
+    }
+    return state;
+  }
+
+  /** Effect, brightness, speed and direction; the colour goes in the palette slot it selects. */
+  private async writeLight(area: number, setting: LightSetting) {
+    if (!this.light?.areas.includes(area))
+      throw new DriverError(`${this.info.name} has no such light.`);
+    const { base, palette } = await this.readLight(area);
+    const slot = setting.rainbow ? 0 : base.colorSlot > 0 ? base.colorSlot : 1;
+    let wrote = false;
+    if (!setting.rainbow) {
+      const c = setting.color;
+      const entry = [c & 0xff, (c >> 8) & 0xff, (c >> 16) & 0xff, palette[slot][3]];
+      if (entry.some((b, i) => b !== palette[slot][i])) {
+        palette[slot] = entry;
+        await this.ask(setPalette(area, palette));
+        wrote = true;
+      }
+    }
+    const next: SlLightBase = {
+      ...base,
+      mode: setting.mode,
+      brightness: Math.round(setting.brightness),
+      speed: Math.round(setting.speed),
+      direction: setting.option ? 1 : 0,
+      colorSlot: slot
+    };
+    if (JSON.stringify(next) !== JSON.stringify(base)) {
+      await this.ask(setLightBase(area, next));
+      wrote = true;
+    }
+    if (wrote) await this.ask(save(Area.LIGHTING));
+  }
+
+  setBacklight(setting: LightSetting): Promise<void> {
+    return this.writeLight(0, setting);
+  }
+
+  setSideLight(setting: LightSetting): Promise<void> {
+    return this.writeLight(1, setting);
+  }
+
+  async setLightsOff(off: { backlightOff?: boolean; sideOff?: boolean }): Promise<void> {
+    if (!this.light) throw new DriverError(`${this.info.name} has no lighting OpenHE can set.`);
+    let wrote = false;
+    for (const [area, value] of [
+      [0, off.backlightOff],
+      [1, off.sideOff]
+    ] as const) {
+      if (value === undefined || !this.light.areas.includes(area)) continue;
+      const base = parseLightBase(await this.ask(getLightBase(area)));
+      // keys with two LED rows light both; other areas take on/off
+      const open = value ? 0 : area === 0 && this.light.double ? LIGHT_OPEN_BOTH : 1;
+      if ((base.open === 0) === value) continue;
+      await this.ask(setLightBase(area, { ...base, open }));
+      wrote = true;
+    }
+    if (wrote) await this.ask(save(Area.LIGHTING));
   }
 
   // ------------------------------------------------------------ macros
@@ -764,8 +919,8 @@ export class SparklinkDriver implements KeyboardDriver {
 // ------------------------------------------------------------ helpers
 
 /**
- * Which of MT's two keycodes is the tap. The vendor's docs do not say;
- * tap first, as most vendor apps list it. Unconfirmed on hardware.
+ * Which of MT's two keycodes is the tap. The vendor's docs do not say; the
+ * vendor app's exported settings list the tap first (as device-hub reads them).
  */
 const MT_TAP = 0;
 
@@ -776,6 +931,93 @@ const SOCD_BEHAVIOR: Record<number, Extract<AdvancedKey, { kind: 'nullBind' }>['
   [SOCD_RULE.NEUTRAL]: 'neutral'
 };
 const RULE_OF = { last: 'LAST', primary: 'MINE', secondary: 'OTHER', neutral: 'NEUTRAL' } as const;
+
+/**
+ * Effects by mode byte, as identified on an SU66 Max by device-hub (camera
+ * checks). Boards may name or order theirs differently; every one takes the
+ * selected palette colour, and palette slot 0 is rainbow.
+ */
+const DIR = ['Forward', 'Backward'];
+const fx = (mode: number, label: string, extra: Partial<LightEffect> = {}): LightEffect => ({
+  mode,
+  label,
+  color: true,
+  speedMax: LIGHT_MAX,
+  ...extra
+});
+const SL_EFFECTS: LightEffect[] = [
+  fx(0, 'Static', { speedMax: null }),
+  fx(1, 'Rainbow scroll', { options: DIR }),
+  fx(2, 'Slow colour shift'),
+  fx(3, 'Fast colour shift'),
+  fx(4, 'Checkerboard'),
+  fx(5, 'Colour cycle'),
+  fx(6, 'Pulse'),
+  fx(7, 'Moving window', { options: DIR }),
+  fx(8, 'Morph'),
+  fx(9, 'Colour bands', { options: DIR }),
+  fx(10, 'Waves', { options: DIR }),
+  fx(11, 'Diagonal sweep', { options: DIR }),
+  fx(12, 'Confetti'),
+  fx(13, 'Mosaic'),
+  fx(14, 'Rain', { options: DIR }),
+  fx(15, 'Bounce'),
+  fx(16, 'Per-key colours', { color: false, speedMax: null }),
+  fx(17, 'Reactive: around the key'),
+  fx(18, 'Reactive: row'),
+  fx(19, 'Reactive: wide')
+];
+
+function toLightSetting(base: SlLightBase, palette: number[][]): LightSetting {
+  const [b, g, r] = palette[base.colorSlot > 0 ? base.colorSlot & 7 : 1] ?? [255, 255, 255];
+  return {
+    mode: base.mode,
+    speed: base.speed,
+    brightness: base.brightness,
+    option: base.direction,
+    rainbow: base.colorSlot === 0,
+    color: (r << 16) | (g << 8) | b
+  };
+}
+
+type DksActions = [DksAction, DksAction, DksAction, DksAction];
+
+/**
+ * One keycode's trps byte as actions at the four points. A run of held
+ * segments is a press where it starts and a release where it ends; a tap bit
+ * at a point a run already covers is part of the run.
+ */
+export function trpsToActions(trps: number): DksActions {
+  const out: DksActions = ['hold', 'hold', 'hold', 'hold'];
+  const held = DKS_BIT.HOLD.map(bit => (trps & bit) !== 0);
+  const covered = [false, false, false, false];
+  for (let i = 0; i < 3; i++) {
+    if (!held[i] || (i > 0 && held[i - 1])) continue;
+    let end = i;
+    while (end < 3 && held[end]) end++;
+    out[i] = 'press';
+    out[end] = 'release';
+    for (let p = i; p <= end; p++) covered[p] = true;
+  }
+  DKS_BIT.TAP.forEach((bit, p) => {
+    if (trps & bit && !covered[p]) out[p] = 'tap';
+  });
+  return out;
+}
+
+/** Actions at the four points as a trps byte; a key still down at the end lets go there. */
+export function actionsToTrps(actions: readonly DksAction[]): number {
+  let trps = 0;
+  let down = false;
+  for (let p = 0; p < 4; p++) {
+    const a = actions[p];
+    if (a === 'press') down = true;
+    else if (a === 'release') down = false;
+    else if (a === 'tap' && !down) trps |= DKS_BIT.TAP[p];
+    if (down && p < 3) trps |= DKS_BIT.HOLD[p];
+  }
+  return trps;
+}
 
 const sameHk = (a: SlHigherKey, b: SlHigherKey) => JSON.stringify(a) === JSON.stringify(b);
 

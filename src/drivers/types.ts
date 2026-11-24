@@ -297,6 +297,8 @@ export type LightZone = {
   brightnessMax: number;
   /** Mode that means off, when the zone has one (edge light: 0). */
   offMode?: number;
+  /** Brightness and speed are shown as percentages (0..100) rather than steps. */
+  percent?: boolean;
 };
 
 /** What a board's lighting can do (`capabilities.rgb`). */
