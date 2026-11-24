@@ -65,6 +65,8 @@ export interface ActuationPageProps {
     min: number;
     max: number;
     step: number;
+    /** Every selected key uses Rapid Trigger, which ignores the release point. */
+    rapidTriggerOn?: boolean;
   };
 }
 function ActuationPage({
@@ -236,7 +238,9 @@ function ActuationPage({
             </div>
           </div>
           {releasePoint && (
-            <div className="rapid-sensitivity-control actuation-release-control">
+            <div
+              className={`rapid-sensitivity-control actuation-release-control ${releasePoint.rapidTriggerOn ? 'is-unavailable' : ''}`}
+            >
               <div className="rapid-control-label">
                 {tr('RELEASE POINT')}{' '}
                 <FeatureHelp
@@ -255,9 +259,16 @@ function ActuationPage({
                 dragStep={0.05}
                 suffix="mm"
                 mixed={releasePoint.mixed}
-                disabled={!hasSelection}
+                disabled={!hasSelection || releasePoint.rapidTriggerOn}
                 onChange={releasePoint.onChange}
               />
+              {hasSelection && releasePoint.rapidTriggerOn && (
+                <p className="actuation-release-note">
+                  {tr(
+                    'Rapid Trigger is on for these keys, so they release with Rapid Trigger instead.'
+                  )}
+                </p>
+              )}
             </div>
           )}
         </article>
