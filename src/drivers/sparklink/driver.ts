@@ -19,7 +19,9 @@ import {
   type DeviceInfo,
   type DeviceOptions,
   type DriverCapabilities,
+  type AdvancedKey,
   type KeyActuation,
+  type MacroStep,
   type KeyboardDriver,
   type LayoutKey,
   type TravelSample
@@ -64,6 +66,28 @@ import {
   SL_USAGE,
   SL_USAGE_PAGE,
   TriggerMode,
+  clearHigherKey,
+  getHigherKey,
+  HK,
+  parseHigherKey,
+  setMt,
+  setSocdPair,
+  setTgl,
+  SOCD_RULE,
+  type SlHigherKey,
+  getMacroHeader,
+  getMacroPage,
+  MACRO_PAGE,
+  MacroPlay,
+  macroSpace,
+  parseMacroHeader,
+  parseMacroPage,
+  setMacroHeader,
+  setMacroPage,
+  SL_MACRO_BASE,
+  SL_MACRO_SLOTS,
+  type SlMacroAction,
+  type SlMacroHeader,
   type SlDeviceInfo,
   type SlFeatures,
   type SlPerformance
@@ -125,10 +149,17 @@ export class SparklinkDriver implements KeyboardDriver {
       rapidTrigger: true,
       rapidTriggerSplit: true,
       continuousRapidTrigger: true,
-      advancedKeys: [],
-      maxAdvancedKeys: 0,
+      advancedKeys: ['nullBind', 'tapHold', 'toggle', 'macro'],
+      maxAdvancedKeys: layout.keys.length,
+      advancedKeyLimits: {
+        baseLayerOnly: ['nullBind', 'tapHold', 'toggle'],
+        nullBindBehaviors: ['last', 'primary', 'secondary', 'neutral'],
+        nullBindBottomOut: false,
+        tapHoldTermMs: { min: 50, max: 2000, step: 10 },
+        holdOnOtherKeyPress: false
+      },
       dynamicKeystrokeBindings: 0,
-      macros: false,
+      macros: true,
       travelStream: true,
       calibration: false,
       rgb: false,
@@ -137,7 +168,7 @@ export class SparklinkDriver implements KeyboardDriver {
       releasePoint: true,
       topDeadzone: true,
       bottomDeadzone: true,
-      writable: { keymap: true, actuation: true, advancedKeys: false },
+      writable: { keymap: true, actuation: true, advancedKeys: true },
       actuationActiveProfileOnly: true
     };
   }
@@ -294,15 +325,7 @@ export class SparklinkDriver implements KeyboardDriver {
       const { row, col } = this.positions[i];
       next.get(row)![col] = code;
     });
-    let wrote = false;
-    for (const [row, codes] of next) {
-      const before = await this.keyRow(layer, row);
-      if (codes.every((c, i) => c === before[i])) continue;
-      await this.ask(setKeyRow(layer, row, codes));
-      this.rowCache.set(`${layer}:${row}`, codes);
-      wrote = true;
-    }
-    if (wrote) await this.ask(save(Area.LAYOUT));
+    await this.writeRows(layer, next);
   }
 
   private checkLayer(layer: number) {
@@ -363,6 +386,346 @@ export class SparklinkDriver implements KeyboardDriver {
     this.perfCache = { profile, values: next };
   }
 
+  // ------------------------------------------------------------ advanced keys
+
+  /** What each layout key has set, read fresh by getAdvancedKeys. */
+  private hkCache: { profile: number; values: SlHigherKey[] } | null = null;
+
+  private async readHigherKeys(profile: number): Promise<SlHigherKey[]> {
+    if (this.hkCache?.profile === profile) return this.hkCache.values;
+    await this.useProfile(profile);
+    const values: SlHigherKey[] = [];
+    for (const { row, col } of this.positions)
+      values.push(parseHigherKey(await this.ask(getHigherKey(row, col))));
+    this.hkCache = { profile, values };
+    return values;
+  }
+
+  /** SOCD, tap-hold (MT) and toggle (TGL); other kinds set elsewhere are left alone. */
+  async getAdvancedKeys(profile: number): Promise<AdvancedKey[]> {
+    this.hkCache = null;
+    const hks = await this.readHigherKeys(profile);
+    const out: AdvancedKey[] = await this.getMacros();
+    const indexOf = new Map(this.positions.map((p, i) => [`${p.row}:${p.col}`, i]));
+    hks.forEach((hk, key) => {
+      if ('other' in hk) return;
+      if (hk.mode === HK.MT)
+        out.push({
+          kind: 'tapHold',
+          layer: 0,
+          key,
+          tap: slToUi(hk.codes[MT_TAP]),
+          hold: slToUi(hk.codes[1 - MT_TAP]),
+          tappingTermMs: hk.timeMs,
+          holdOnOtherKeyPress: false
+        });
+      else if (hk.mode === HK.TGL)
+        out.push({
+          kind: 'toggle',
+          layer: 0,
+          key,
+          keycode: slToUi(hk.code),
+          tappingTermMs: hk.timeMs
+        });
+      else if (hk.mode === HK.SOCD) {
+        const partner = indexOf.get(`${hk.partner.row}:${hk.partner.col}`);
+        // one entry per pair, from the first key in layout order
+        if (partner !== undefined && partner < key && hks[partner].mode === HK.SOCD) return;
+        out.push({
+          kind: 'nullBind',
+          layer: 0,
+          key,
+          secondaryKey: partner ?? key,
+          behavior: SOCD_BEHAVIOR[hk.rule] ?? 'last',
+          bottomOutMm: 0
+        });
+      }
+    });
+    return out;
+  }
+
+  async setAdvancedKeys(profile: number, all: readonly AdvancedKey[]): Promise<void> {
+    await this.useProfile(profile);
+    await this.setMacros(all.filter(k => k.kind === 'macro'));
+    const keys = all.filter(k => k.kind !== 'macro');
+    for (const ak of keys) {
+      if (ak.kind === 'dynamicKeystroke')
+        throw new DriverError(
+          'This board does not take that kind of advanced key from OpenHE yet.'
+        );
+      if (ak.layer !== 0)
+        throw new DriverError('Advanced keys work on the base layer on this board.');
+      if (ak.kind === 'nullBind' && ak.behavior === 'distance')
+        throw new DriverError('This board’s SOCD has no "deeper press wins" rule.');
+    }
+    const current = await this.readHigherKeys(profile);
+    const base = new Map<number, number[]>();
+    for (const row of this.rows) base.set(row, await this.keyRow(0, row));
+    const own = (key: number) => {
+      const { row, col } = this.positions[key];
+      return base.get(row)![col];
+    };
+    const code = (value: UiKeycode) => {
+      const c = uiToSl(value);
+      if (c === null)
+        throw new DriverError('An advanced key uses a keycode this keyboard cannot store.');
+      return c;
+    };
+
+    // what every key should hold afterwards
+    const next: SlHigherKey[] = current.map(hk => ('other' in hk ? hk : { mode: HK.NONE }));
+    for (const ak of keys) {
+      if (ak.kind === 'tapHold') {
+        const codes: [number, number] = [0, 0];
+        codes[MT_TAP] = code(ak.tap);
+        codes[1 - MT_TAP] = code(ak.hold);
+        next[ak.key] = { mode: HK.MT, codes, timeMs: Math.round(ak.tappingTermMs) };
+      } else if (ak.kind === 'toggle') {
+        next[ak.key] = {
+          mode: HK.TGL,
+          code: code(ak.keycode),
+          timeMs: Math.round(ak.tappingTermMs)
+        };
+      } else if (ak.kind === 'nullBind') {
+        const was = current[ak.key];
+        const delayMs = was.mode === HK.SOCD && 'delayMs' in was ? was.delayMs : 0;
+        const rule = SOCD_RULE[RULE_OF[ak.behavior as keyof typeof RULE_OF]];
+        const a = this.positions[ak.key];
+        const b = this.positions[ak.secondaryKey];
+        next[ak.key] = {
+          mode: HK.SOCD,
+          partner: b,
+          codes: [own(ak.key), own(ak.secondaryKey)],
+          delayMs,
+          rule
+        };
+        next[ak.secondaryKey] = {
+          mode: HK.SOCD,
+          partner: a,
+          codes: [own(ak.secondaryKey), own(ak.key)],
+          delayMs,
+          rule:
+            rule === SOCD_RULE.MINE
+              ? SOCD_RULE.OTHER
+              : rule === SOCD_RULE.OTHER
+                ? SOCD_RULE.MINE
+                : rule
+        };
+      }
+    }
+
+    let wrote = false;
+    const done = new Set<number>();
+    for (let key = 0; key < next.length; key++) {
+      if (done.has(key) || sameHk(current[key], next[key])) continue;
+      const { row, col } = this.positions[key];
+      const hk = next[key];
+      if (hk.mode === HK.NONE) await this.ask(clearHigherKey(row, col));
+      else if (hk.mode === HK.MT && 'codes' in hk && !('partner' in hk))
+        await this.ask(setMt(row, col, hk.codes, hk.timeMs));
+      else if (hk.mode === HK.TGL && 'code' in hk)
+        await this.ask(setTgl(row, col, hk.code, hk.timeMs));
+      else if (hk.mode === HK.SOCD && 'partner' in hk) {
+        const other = this.positions.findIndex(
+          p => p.row === hk.partner.row && p.col === hk.partner.col
+        );
+        const [first, second] = setSocdPair(
+          { row, col, code: hk.codes[0] },
+          { ...hk.partner, code: hk.codes[1] },
+          hk.rule,
+          hk.delayMs
+        );
+        await this.ask(first);
+        await this.ask(second);
+        done.add(other);
+      } else continue;
+      wrote = true;
+    }
+    if (wrote) await this.ask(save(Area.HIGHER_KEY));
+    this.hkCache = { profile, values: next };
+  }
+
+  // ------------------------------------------------------------ macros
+
+  private readonly macroCache = new Map<
+    number,
+    { header: SlMacroHeader; actions: SlMacroAction[] }
+  >();
+  private macroLimit: number | null = null;
+
+  private async macro(slot: number) {
+    let m = this.macroCache.get(slot);
+    if (!m) {
+      const header = parseMacroHeader(await this.ask(getMacroHeader(slot)));
+      const actions: SlMacroAction[] = [];
+      if (header.valid)
+        for (let page = 0; page * MACRO_PAGE < header.actions; page++)
+          actions.push(...parseMacroPage(await this.ask(getMacroPage(slot, page))));
+      m = { header, actions: actions.slice(0, header.valid ? header.actions : 0) };
+      this.macroCache.set(slot, m);
+    }
+    return m;
+  }
+
+  /** Actions one macro can hold: the board's total over its slot count. */
+  private async maxActions(): Promise<number> {
+    if (this.macroLimit === null)
+      this.macroLimit = await optional(async () => {
+        const d = await this.ask(macroSpace());
+        const count = d[3] || SL_MACRO_SLOTS;
+        const total = d[4] | (d[5] << 8);
+        return total ? Math.floor(total / count) : 60;
+      }, 60);
+    return this.macroLimit;
+  }
+
+  /** Keys playing macro slot n carry 0xF500 + n, on any layer. */
+  private async macroKeys(): Promise<Array<{ layer: number; key: number; slot: number }>> {
+    const out: Array<{ layer: number; key: number; slot: number }> = [];
+    for (let layer = 0; layer < SL_LAYERS; layer++) {
+      const rows = new Map<number, number[]>();
+      for (const row of this.rows) rows.set(row, await this.keyRow(layer, row, true));
+      this.positions.forEach(({ row, col }, key) => {
+        const code = rows.get(row)![col];
+        if (code >= SL_MACRO_BASE && code < SL_MACRO_BASE + SL_MACRO_SLOTS)
+          out.push({ layer, key, slot: code - SL_MACRO_BASE });
+      });
+    }
+    return out;
+  }
+
+  private async getMacros(): Promise<AdvancedKey[]> {
+    this.macroCache.clear();
+    const out: AdvancedKey[] = [];
+    for (const { layer, key, slot } of await this.macroKeys()) {
+      const { header, actions } = await this.macro(slot);
+      out.push({
+        kind: 'macro',
+        layer,
+        key,
+        steps: actions.map(a => ({
+          keycode: slToUi(a.code),
+          action: a.press ? 'press' : 'release',
+          delayMs: a.delayMs
+        })),
+        mode:
+          header.mode === MacroPlay.HOLD || header.mode === MacroPlay.HOLD_FINISHES
+            ? 'hold'
+            : header.mode === MacroPlay.TAP_STOPS
+              ? 'toggle'
+              : header.repeat > 1
+                ? 'repeat'
+                : 'once',
+        repeat: Math.max(1, Math.min(header.repeat, 255)),
+        slMacroSlot: slot
+      } as AdvancedKey);
+    }
+    return out;
+  }
+
+  private async setMacros(keys: readonly AdvancedKey[]): Promise<void> {
+    const macros = keys as ReadonlyArray<
+      Extract<AdvancedKey, { kind: 'macro' }> & { slMacroSlot?: number }
+    >;
+    const mine = await this.macroKeys();
+    const limit = await this.maxActions();
+    const wanted = macros.map(ak => {
+      const actions = stepsToActions(ak.steps);
+      if (actions.length > limit)
+        throw new DriverError(
+          `A macro on this keyboard holds at most ${limit} presses and releases.`
+        );
+      const header: SlMacroHeader = {
+        valid: true,
+        actions: actions.length,
+        ...(ak.mode === 'hold'
+          ? { mode: MacroPlay.HOLD, repeat: 1 }
+          : ak.mode === 'toggle'
+            ? { mode: MacroPlay.TAP_STOPS, repeat: 0xffff }
+            : { mode: MacroPlay.ONCE, repeat: ak.mode === 'repeat' ? Math.max(1, ak.repeat) : 1 })
+      };
+      return { ak, actions, header, id: macroId(header, actions) };
+    });
+    if (!wanted.length && !mine.length) return;
+
+    // slots this profile plays are ours; other valid slots may belong to another profile
+    const ours = new Set(mine.map(m => m.slot));
+    const protectedSlots = new Set<number>();
+    for (let slot = 0; slot < SL_MACRO_SLOTS; slot++)
+      if (!ours.has(slot) && (await this.macro(slot)).header.valid) protectedSlots.add(slot);
+    const content = async (slot: number) => {
+      const m = await this.macro(slot);
+      return macroId(m.header, m.actions);
+    };
+    const slotOf = new Map<string, number>();
+    const taken = new Set<number>();
+    const hints = new Set(
+      macros.map(m => m.slMacroSlot).filter((x): x is number => x !== undefined)
+    );
+    let wrote = false;
+    for (const w of wanted) {
+      if (slotOf.has(w.id)) continue;
+      let slot = -1;
+      const hint = w.ak.slMacroSlot;
+      if (
+        hint !== undefined &&
+        !taken.has(hint) &&
+        (!protectedSlots.has(hint) || (await content(hint)) === w.id)
+      )
+        slot = hint;
+      if (slot < 0)
+        for (let s = 0; s < SL_MACRO_SLOTS && slot < 0; s++)
+          if (!taken.has(s) && !protectedSlots.has(s) && !hints.has(s)) slot = s;
+      for (let s = 0; s < SL_MACRO_SLOTS && slot < 0; s++)
+        if (!taken.has(s) && !protectedSlots.has(s)) slot = s;
+      if (slot < 0)
+        throw new DriverError(
+          `The keyboard holds ${SL_MACRO_SLOTS} macros, and the other profiles use the rest.`
+        );
+      taken.add(slot);
+      slotOf.set(w.id, slot);
+      if ((await content(slot)) === w.id) continue;
+      const pages = Math.max(1, Math.ceil(w.actions.length / MACRO_PAGE));
+      for (let page = 0; page < pages; page++)
+        await this.ask(
+          setMacroPage(slot, page, w.actions.slice(page * MACRO_PAGE, (page + 1) * MACRO_PAGE))
+        );
+      await this.ask(setMacroHeader(slot, w.header));
+      this.macroCache.set(slot, { header: w.header, actions: w.actions });
+      wrote = true;
+    }
+    if (wrote) await this.ask(save(Area.MACRO));
+
+    // bind the keys; a key that lost its macro goes back to its default (base) or falls through
+    for (let layer = 0; layer < SL_LAYERS; layer++) {
+      const rows = new Map<number, number[]>();
+      for (const row of this.rows) rows.set(row, [...(await this.keyRow(layer, row))]);
+      const set = (key: number, code: number) => {
+        const { row, col } = this.positions[key];
+        rows.get(row)![col] = code;
+      };
+      for (const m of mine)
+        if (m.layer === layer)
+          set(m.key, layer === 0 ? (uiToSl(this.defaults?.[m.key] ?? 0) ?? 0) : SL_TRANSPARENT);
+      for (const w of wanted)
+        if (w.ak.layer === layer) set(w.ak.key, SL_MACRO_BASE + slotOf.get(w.id)!);
+      await this.writeRows(layer, rows);
+    }
+  }
+
+  /** Write the rows that changed, then save the layout. */
+  private async writeRows(layer: number, next: Map<number, number[]>): Promise<void> {
+    let wrote = false;
+    for (const [row, codes] of next) {
+      const before = await this.keyRow(layer, row);
+      if (codes.every((c, i) => c === before[i])) continue;
+      await this.ask(setKeyRow(layer, row, codes));
+      this.rowCache.set(`${layer}:${row}`, codes);
+      wrote = true;
+    }
+    if (wrote) await this.ask(save(Area.LAYOUT));
+  }
+
   // ------------------------------------------------------------ live travel
 
   async readTravel(): Promise<TravelSample[]> {
@@ -399,6 +762,47 @@ export class SparklinkDriver implements KeyboardDriver {
 }
 
 // ------------------------------------------------------------ helpers
+
+/**
+ * Which of MT's two keycodes is the tap. The vendor's docs do not say;
+ * tap first, as most vendor apps list it. Unconfirmed on hardware.
+ */
+const MT_TAP = 0;
+
+const SOCD_BEHAVIOR: Record<number, Extract<AdvancedKey, { kind: 'nullBind' }>['behavior']> = {
+  [SOCD_RULE.LAST]: 'last',
+  [SOCD_RULE.MINE]: 'primary',
+  [SOCD_RULE.OTHER]: 'secondary',
+  [SOCD_RULE.NEUTRAL]: 'neutral'
+};
+const RULE_OF = { last: 'LAST', primary: 'MINE', secondary: 'OTHER', neutral: 'NEUTRAL' } as const;
+
+const sameHk = (a: SlHigherKey, b: SlHigherKey) => JSON.stringify(a) === JSON.stringify(b);
+
+/** A macro's identity, independent of how its objects were built. */
+const macroId = (h: SlMacroHeader, actions: readonly SlMacroAction[]) =>
+  JSON.stringify([
+    h.valid,
+    h.actions,
+    h.repeat,
+    h.mode,
+    actions.map(a => [a.press, a.delayMs, a.code])
+  ]);
+
+/** Steps as board actions; a tap is a press and a release. */
+function stepsToActions(steps: readonly MacroStep[]): SlMacroAction[] {
+  const out: SlMacroAction[] = [];
+  for (const step of steps) {
+    const code = uiToSl(step.keycode);
+    if (code === null || code === 0)
+      throw new DriverError('A macro step uses a key this keyboard cannot play in a macro.');
+    const delayMs = Math.max(0, Math.round(step.delayMs));
+    if (step.action === 'tap')
+      out.push({ press: true, delayMs: 0, code }, { press: false, delayMs, code });
+    else out.push({ press: step.action === 'press', delayMs, code });
+  }
+  return out;
+}
 
 /** One request; the reply must echo the group and sub-command. */
 async function call(

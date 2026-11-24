@@ -26,9 +26,12 @@ const le = v => [v & 0xff, (v >> 8) & 0xff]
 function fakeBoard({ magnetic = true, rows = [15, 15, 14, 14, 10], profiles = 4, rates = [0, 1, 3, 6] } = {}) {
   const N_LAYERS = 4
   const state = { profile: 0, rate: 3, writes: [], saves: [], resets: 0 }
+  // macros: shared by every profile, 16 slots of up to 60 actions
+  const macros = Array.from({ length: 16 }, () => ({ header: [0, 0, 0, 0, 0, 0], actions: new Array(60 * 4).fill(0) }))
   const cfg = Array.from({ length: profiles }, () => ({
     keys: Array.from({ length: N_LAYERS }, () => Array.from({ length: 8 }, () => new Array(21).fill(0))),
-    perf: new Map()
+    perf: new Map(),
+    hk: new Map()
   }))
   // a plain staggered board: every key 1u except the row ends
   const style = Array.from({ length: 8 }, () => new Array(21).fill(0))
@@ -104,6 +107,31 @@ function fakeBoard({ magnetic = true, rows = [15, 15, 14, 14, 10], profiles = 4,
         else { state.rate = req[3]; out[3] = req[3] }
         break
       case 0x020c: out[3] = 10; break
+      case 0x020e: out[3] = 16; out.set(le(960), 4); break
+      case 0x0701: out[2] = req[2]; out.set(macros[req[2]].header, 3); break
+      case 0x0702: macros[req[2]].header = [...req.subarray(3, 9)]; state.writes.push(['macroHeader', req[2]]); out[2] = req[2]; break
+      case 0x0703: out[2] = req[2]; out[3] = req[3]; out.set(macros[req[2]].actions.slice(req[3] * 60, req[3] * 60 + 60), 4); break
+      case 0x0704: {
+        const m = macros[req[2]]
+        for (let i = 0; i < 60; i++) m.actions[req[3] * 60 + i] = req[4 + i]
+        state.writes.push(['macroPage', req[2], req[3]])
+        out[2] = req[2]; out[3] = req[3]
+        break
+      }
+      case 0x0601: { // read: the stored record, whatever its mode
+        out[2] = req[2]; out[3] = req[3]
+        const rec = p.hk.get(`${req[2]}:${req[3]}`)
+        if (rec) out.set(rec.slice(4), 4)
+        break
+      }
+      case 0x0602: {
+        const k = `${req[2]}:${req[3]}`
+        if (req[4] === 0) p.hk.delete(k)
+        else p.hk.set(k, [...req.subarray(0, 40)])
+        state.writes.push(['hk', req[2], req[3], req[4]])
+        out[2] = req[2]; out[3] = req[3]; out[4] = req[4]
+        break
+      }
       default: out[0] = 0xff
     }
     return out
@@ -118,7 +146,7 @@ function fakeBoard({ magnetic = true, rows = [15, 15, 14, 14, 10], profiles = 4,
     },
     async close() {}
   }
-  return { transport, state, cfg, route, style }
+  return { transport, state, cfg, route, style, macros }
 }
 
 test('only listed ids on the 0xFFB0 interface count as Sparklink boards', () => {
@@ -262,4 +290,98 @@ test('replies are matched on group and sub-command; stray reports are skipped', 
   const t = new InputReportTransport(device, 0)
   const r = await t.exchange(Uint8Array.from([0x02, 0x0c, 0]), 500, x => x[0] === 0x02 && x[1] === 0x0c)
   assert.equal(r[2], 0x2a)
+})
+
+test('advanced keys: SOCD pairs, tap-hold, toggle; vendor-only kinds left alone', async () => {
+  const { transport, state, cfg } = fakeBoard()
+  const d = await SparklinkDriver.connect(transport, usb)
+  assert.deepEqual(d.capabilities.advancedKeys, ['nullBind', 'tapHold', 'toggle', 'macro'])
+  // a DKS someone set in the vendor app on key (1,5)
+  cfg[0].hk.set('1:5', [6, 2, 1, 5, 1, 0x14, 0, 0x1a, 0, 0, 0, 0, 0, 31, 31, 31, 31])
+  assert.deepEqual(await d.getAdvancedKeys(0), [])
+  // A = row 2 col 1, D = row 2 col 3 in the fake's layout (key indices 31 and 33)
+  const keys = [
+    { kind: 'nullBind', layer: 0, key: 31, secondaryKey: 33, behavior: 'primary', bottomOutMm: 0 },
+    { kind: 'tapHold', layer: 0, key: 30, tap: 0x29, hold: 0x10000, tappingTermMs: 220, holdOnOtherKeyPress: false },
+    { kind: 'toggle', layer: 0, key: 2, keycode: 0x1e, tappingTermMs: 300 }
+  ]
+  await d.setAdvancedKeys(0, keys)
+  const rec = (r, c) => cfg[0].hk.get(`${r}:${c}`)
+  // SOCD: both keys, each naming the other, own keycode first, mirrored rule
+  const a = rec(2, 1), b = rec(2, 3)
+  assert.equal(a[4], 6); assert.deepEqual([a[5], a[6]], [2, 3]); assert.equal(a[13], 1)
+  assert.equal(b[4], 6); assert.deepEqual([b[5], b[6]], [2, 1]); assert.equal(b[13], 2)
+  assert.equal(a[7] | (a[8] << 8), cfg[0].keys[0][2][1])
+  // MT: tap first, hold second, time in ms
+  const mt = rec(2, 0)
+  assert.equal(mt[4], 3)
+  assert.deepEqual([mt[5] | (mt[6] << 8), mt[7] | (mt[8] << 8), mt[9] | (mt[10] << 8)], [0x29, 0xe0, 220])
+  const tgl = rec(0, 2)
+  assert.deepEqual([tgl[4], tgl[5] | (tgl[6] << 8), tgl[7] | (tgl[8] << 8)], [4, 0x1e, 300])
+  assert.ok(state.saves.includes(0x05))
+  assert.ok(cfg[0].hk.has('1:5')) // the vendor's DKS survives
+  // read back exactly what was written
+  const back = await d.getAdvancedKeys(0)
+  const byKind = k => back.find(x => x.kind === k)
+  assert.deepEqual(byKind('nullBind'), keys[0])
+  assert.deepEqual(byKind('tapHold'), keys[1])
+  assert.deepEqual(byKind('toggle'), keys[2])
+  // unchanged: nothing written; removing: cleared, the DKS still there
+  const before = state.writes.length
+  await d.setAdvancedKeys(0, back)
+  assert.equal(state.writes.length, before)
+  await d.setAdvancedKeys(0, [])
+  assert.equal(cfg[0].hk.size, 1)
+  assert.ok(cfg[0].hk.has('1:5'))
+  await assert.rejects(d.setAdvancedKeys(0, [{ ...keys[0], behavior: 'distance' }]), /deeper press/)
+  await assert.rejects(d.setAdvancedKeys(0, [{ ...keys[2], layer: 1 }]), /base layer/)
+})
+
+test('macros: 16 shared slots, played by M0..M15 keycodes on any layer', async () => {
+  const { transport, state, cfg, macros } = fakeBoard()
+  const d = await SparklinkDriver.connect(transport, usb)
+  // slot 0 holds another profile's macro: not ours to overwrite
+  macros[0].header = [1, 2, 0, 1, 0, 0]
+  const steps = [
+    { keycode: 0x10000, action: 'press', delayMs: 15 },
+    { keycode: 0x06, action: 'tap', delayMs: 40 },
+    { keycode: 0x10000, action: 'release', delayMs: 0 }
+  ]
+  const keys = [
+    { kind: 'macro', layer: 0, key: 5, steps, mode: 'repeat', repeat: 3 },
+    { kind: 'macro', layer: 1, key: 6, steps, mode: 'hold', repeat: 1 },
+    { kind: 'tapHold', layer: 0, key: 30, tap: 0x29, hold: 0x10000, tappingTermMs: 200, holdOnOtherKeyPress: false }
+  ]
+  await d.setAdvancedKeys(0, keys)
+  // the repeat-3 macro took slot 1 (slot 0 is protected), the held one slot 2
+  assert.equal(cfg[0].keys[0][0][5], 0xf501)
+  assert.equal(cfg[0].keys[1][0][6], 0xf502)
+  assert.deepEqual(macros[1].header, [1, 4, 0, 3, 0, 0]) // valid, 4 actions, repeat 3, mode 0
+  assert.deepEqual(macros[2].header, [1, 4, 0, 1, 0, 4]) // hold
+  // action 2 is C pressed with no delay; bit 31 set, keycode 0x06
+  const a = macros[1].actions
+  assert.deepEqual(a.slice(4, 8), [0x06, 0x00, 0x00, 0x80])
+  assert.deepEqual(a.slice(8, 12), [0x06, 0x00, 40, 0x00])
+  assert.ok(state.saves.includes(0x06))
+  assert.equal(macros[0].header[0], 1)
+
+  const back = await d.getAdvancedKeys(0)
+  const m = back.filter(k => k.kind === 'macro')
+  assert.equal(m.length, 2)
+  assert.equal(m[0].mode, 'repeat'); assert.equal(m[0].repeat, 3)
+  assert.deepEqual(m[0].steps.map(s => s.action), ['press', 'press', 'release', 'release'])
+  assert.equal(m[1].layer, 1); assert.equal(m[1].mode, 'hold')
+  assert.ok(back.some(k => k.kind === 'tapHold'))
+  // unchanged: nothing written
+  const before = state.writes.length
+  await d.setAdvancedKeys(0, back)
+  assert.equal(state.writes.length, before)
+  // removing the macros: base key back to its default, Fn key falls through
+  await d.setAdvancedKeys(0, back.filter(k => k.kind !== 'macro'))
+  assert.equal(cfg[0].keys[0][0][5], 0x09)
+  assert.equal(cfg[0].keys[1][0][6], 0x0001)
+  await assert.rejects(
+    d.setAdvancedKeys(0, [{ ...keys[0], steps: Array(61).fill(steps[0]) }]),
+    /at most 60/
+  )
 })

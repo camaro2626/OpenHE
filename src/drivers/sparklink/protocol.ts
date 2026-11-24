@@ -297,3 +297,184 @@ export const SL_MOUSE: Readonly<Record<number, number>> = {
   0x4400: 5,
   0x4500: 4
 };
+
+// ------------------------------------------------------------ advanced keys
+
+/** Advanced-key modes (protocol-keyboard-v2 HigherKeyMode). */
+export const HK = {
+  NONE: 0x00,
+  DKS: 0x01,
+  MPT: 0x02,
+  MT: 0x03,
+  TGL: 0x04,
+  END: 0x05,
+  SOCD: 0x06,
+  RS: 0x07,
+  MDS: 0x08,
+  TURBO: 0x09,
+  SOCD_V2: 0x0a,
+  SOCD4: 0x0f
+} as const;
+export const HK_READ = 0x01;
+export const HK_WRITE = 0x02;
+/** SOCD rule as the first key of the pair sees it: 0 last wins, 1 it wins, 2 the other wins, 3 neither. */
+export const SOCD_RULE = { LAST: 0, MINE: 1, OTHER: 2, NEUTRAL: 3 } as const;
+
+/** One key's advanced-key record. Reading with mode NONE returns whatever is set. */
+export const getHigherKey = (row: number, col: number) =>
+  packet([Group.HIGHER_KEY, HK_READ, row, col, HK.NONE]);
+export const clearHigherKey = (row: number, col: number) =>
+  packet([Group.HIGHER_KEY, HK_WRITE, row, col, HK.NONE]);
+
+export type SlHigherKey =
+  | { mode: typeof HK.NONE }
+  | { mode: typeof HK.MT; codes: [number, number]; timeMs: number }
+  | { mode: typeof HK.TGL; code: number; timeMs: number }
+  | {
+      mode: typeof HK.SOCD;
+      partner: { row: number; col: number };
+      codes: [number, number];
+      delayMs: number;
+      rule: number;
+    }
+  /** Anything OpenHE does not edit (DKS, MPT, END, RS, MDS, Turbo, newer SOCD). */
+  | { mode: number; other: true };
+
+export function parseHigherKey(d: Uint8Array): SlHigherKey {
+  const mode = d[4];
+  switch (mode) {
+    case HK.NONE:
+      return { mode };
+    case HK.MT:
+      return { mode, codes: [u16(d, 5), u16(d, 7)], timeMs: u16(d, 9) };
+    case HK.TGL:
+      return { mode, code: u16(d, 5), timeMs: u16(d, 7) };
+    case HK.SOCD:
+      return {
+        mode,
+        partner: { row: d[5], col: d[6] },
+        codes: [u16(d, 7), u16(d, 9)],
+        delayMs: u16(d, 11),
+        rule: d[13]
+      };
+    default:
+      return { mode, other: true };
+  }
+}
+
+export const setMt = (row: number, col: number, codes: [number, number], timeMs: number) =>
+  packet([
+    Group.HIGHER_KEY,
+    HK_WRITE,
+    row,
+    col,
+    HK.MT,
+    ...le16(codes[0]),
+    ...le16(codes[1]),
+    ...le16(timeMs)
+  ]);
+
+export const setTgl = (row: number, col: number, code: number, timeMs: number) =>
+  packet([Group.HIGHER_KEY, HK_WRITE, row, col, HK.TGL, ...le16(code), ...le16(timeMs)]);
+
+/** Both keys of a SOCD pair, each carrying the other; the rule mirrors for the second key. */
+export function setSocdPair(
+  a: { row: number; col: number; code: number },
+  b: { row: number; col: number; code: number },
+  rule: number,
+  delayMs: number
+): [Uint8Array, Uint8Array] {
+  const mirror =
+    rule === SOCD_RULE.MINE ? SOCD_RULE.OTHER : rule === SOCD_RULE.OTHER ? SOCD_RULE.MINE : rule;
+  const one = (me: typeof a, other: typeof a, r: number) =>
+    packet([
+      Group.HIGHER_KEY,
+      HK_WRITE,
+      me.row,
+      me.col,
+      HK.SOCD,
+      other.row,
+      other.col,
+      ...le16(me.code),
+      ...le16(other.code),
+      ...le16(delayMs),
+      r
+    ]);
+  return [one(a, b, rule), one(b, a, mirror)];
+}
+
+// ------------------------------------------------------------ macros
+
+export const MacroCmd = { GET_MODE: 0x01, SET_MODE: 0x02, GET: 0x03, SET: 0x04 } as const;
+/** Keycode that plays macro slot n: 0xF500 + n. */
+export const SL_MACRO_BASE = 0xf500;
+export const SL_MACRO_SLOTS = 16;
+/** Actions in one macro packet. */
+export const MACRO_PAGE = 15;
+export const MACRO_MAX_DELAY = 0x7fff;
+/**
+ * Playback modes: 0 tap runs it N times (a tap meanwhile is ignored),
+ * 1 ... a tap restarts it, 2 ... a tap stops it, 3 ... a tap stops it after
+ * this run, 4 repeats while held and stops on release, 5 ... finishes the
+ * run on release.
+ */
+export const MacroPlay = {
+  ONCE: 0,
+  RESTART: 1,
+  TAP_STOPS: 2,
+  TAP_FINISHES: 3,
+  HOLD: 4,
+  HOLD_FINISHES: 5
+} as const;
+
+export type SlMacroAction = { press: boolean; delayMs: number; code: number };
+export type SlMacroHeader = { valid: boolean; actions: number; repeat: number; mode: number };
+
+export const macroSpace = () => packet([Group.GLOBAL, 0x0e, 0x00]);
+export const getMacroHeader = (slot: number) => packet([Group.MACRO, MacroCmd.GET_MODE, slot]);
+export const setMacroHeader = (slot: number, h: SlMacroHeader) =>
+  packet([
+    Group.MACRO,
+    MacroCmd.SET_MODE,
+    slot,
+    h.valid ? 1 : 0,
+    ...le16(h.actions),
+    ...le16(h.repeat),
+    h.mode
+  ]);
+
+export function parseMacroHeader(d: Uint8Array): SlMacroHeader {
+  return { valid: d[3] === 1, actions: u16(d, 4), repeat: u16(d, 6), mode: d[8] };
+}
+
+export const getMacroPage = (slot: number, page: number) =>
+  packet([Group.MACRO, MacroCmd.GET, slot, page]);
+
+/** One action: bit 31 pressed, bits 16..30 delay (ms), bits 0..15 keycode; little-endian. */
+const actionBytes = (a: SlMacroAction) => {
+  const v =
+    ((a.press ? 1 : 0) * 0x80000000 +
+      (Math.min(a.delayMs, MACRO_MAX_DELAY) << 16) +
+      (a.code & 0xffff)) >>>
+    0;
+  return [v & 0xff, (v >>> 8) & 0xff, (v >>> 16) & 0xff, v >>> 24];
+};
+
+export const setMacroPage = (slot: number, page: number, actions: readonly SlMacroAction[]) =>
+  packet([
+    Group.MACRO,
+    MacroCmd.SET,
+    slot,
+    page,
+    ...actions.slice(0, MACRO_PAGE).flatMap(actionBytes)
+  ]);
+
+export function parseMacroPage(d: Uint8Array): SlMacroAction[] {
+  const out: SlMacroAction[] = [];
+  for (let i = 0; i < MACRO_PAGE; i++) {
+    const v =
+      (d[4 + i * 4] | (d[5 + i * 4] << 8) | (d[6 + i * 4] << 16) | (d[7 + i * 4] << 24)) >>> 0;
+    out.push({ press: v >>> 31 === 1, delayMs: (v >>> 16) & 0x7fff, code: v & 0xffff });
+  }
+  return out;
+}
