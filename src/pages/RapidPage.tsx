@@ -6,12 +6,14 @@ import FeatureHelp from '../components/FeatureHelp';
 import type { AdvancedBinding } from '../protocol/hero68/advanced';
 import { heroLayout } from '../keyboard/layout';
 import type { HeroDeviceModelId } from '../keyboard/devices';
-import { isXsPrecisionModel, rapidTriggerValuesForModel } from '../app/helpers';
+import { travelLimitsForModel, type TravelLimits } from '../app/helpers';
 import { Toggle } from '../app/components/Toggle';
 import { RangeControl } from '../app/components/RangeControl';
 import { VerticalRangeControl } from '../app/components/VerticalRangeControl';
 export interface RapidPageProps {
   model: HeroDeviceModelId;
+  /** Slider limits; OpenAula's defaults for the model when absent. */
+  limits?: TravelLimits;
   advancedBindings: AdvancedBinding[];
   selectedKeys: Set<string>;
   toggleKey: (keyId: string) => void;
@@ -76,6 +78,7 @@ export interface RapidPageProps {
 }
 function RapidPage({
   model,
+  limits,
   advancedBindings,
   selectedKeys,
   toggleKey,
@@ -120,9 +123,9 @@ function RapidPage({
 }: RapidPageProps) {
   const { tr } = useI18n();
   const [cardHovered, setCardHovered] = useState(false);
-  const isXs = isXsPrecisionModel(model);
-  const rapidTriggerValues = rapidTriggerValuesForModel(model);
-  const minRt = isXs ? 0.005 : 0.01;
+  const lim = limits ?? travelLimitsForModel(model);
+  const rapidTriggerValues = lim.rtValues;
+  const minRt = lim.rtMin;
   return (
     <div className="page quick-page rapid-page page-enter">
       <section className="keyboard-stage rapid-keyboard-stage">
@@ -262,8 +265,8 @@ function RapidPage({
               <RangeControl
                 value={rapidSensitivity}
                 min={minRt}
-                max={3.4}
-                step={isXs ? 0.005 : 0.01}
+                max={lim.rtMax}
+                step={lim.step}
                 dragStep={0.01}
                 allowedValues={rapidTriggerValues}
                 suffix="mm"
@@ -284,8 +287,8 @@ function RapidPage({
                 <RangeControl
                   value={pressSensitivity}
                   min={minRt}
-                  max={3.4}
-                  step={isXs ? 0.005 : 0.01}
+                  max={lim.rtMax}
+                  step={lim.step}
                   dragStep={0.01}
                   allowedValues={rapidTriggerValues}
                   suffix="mm"
@@ -300,8 +303,8 @@ function RapidPage({
                 <RangeControl
                   value={releaseSensitivity}
                   min={minRt}
-                  max={3.4}
-                  step={isXs ? 0.005 : 0.01}
+                  max={lim.rtMax}
+                  step={lim.step}
                   dragStep={0.01}
                   allowedValues={rapidTriggerValues}
                   suffix="mm"
@@ -348,8 +351,8 @@ function RapidPage({
               <VerticalRangeControl
                 value={topDeadzone}
                 min={0}
-                max={1}
-                step={isXs ? 0.005 : 0.01}
+                max={lim.deadzoneMax}
+                step={lim.step}
                 suffix="mm"
                 disabled={!deadzoneControlsEnabled}
                 mixed={topDeadzoneMixed}
@@ -362,8 +365,8 @@ function RapidPage({
               <VerticalRangeControl
                 value={bottomDeadzone}
                 min={0}
-                max={1}
-                step={isXs ? 0.005 : 0.01}
+                max={lim.deadzoneMax}
+                step={lim.step}
                 suffix="mm"
                 disabled={!deadzoneControlsEnabled}
                 mixed={bottomDeadzoneMixed}

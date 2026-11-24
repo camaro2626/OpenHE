@@ -4,7 +4,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import Hero68Preview from '../components/Hero68Preview';
 import type { AdvancedBinding } from '../protocol/hero68/advanced';
 import type { HeroDeviceModelId } from '../keyboard/devices';
-import { isXsPrecisionModel, rapidTriggerValuesForModel } from '../app/helpers';
+import { travelLimitsForModel, type TravelLimits } from '../app/helpers';
 import type { SwitchOption } from '../app/switchAssets';
 import { SwitchSimPreview } from '../app/components/SwitchSimPreview';
 import { Toggle } from '../app/components/Toggle';
@@ -12,6 +12,8 @@ import { RangeControl } from '../app/components/RangeControl';
 import { VerticalRangeControl } from '../app/components/VerticalRangeControl';
 export interface QuickSettingsPageProps {
   model: HeroDeviceModelId;
+  /** Slider limits; OpenAula's defaults for the model when absent. */
+  limits?: TravelLimits;
   advancedBindings: AdvancedBinding[];
   selectedKeys: Set<string>;
   toggleKey: (keyId: string) => void;
@@ -78,6 +80,7 @@ export interface QuickSettingsPageProps {
 }
 function QuickSettingsPage({
   model,
+  limits,
   advancedBindings,
   selectedKeys,
   toggleKey,
@@ -129,9 +132,9 @@ function QuickSettingsPage({
   setQuickPreviewMode
 }: QuickSettingsPageProps) {
   const { tr } = useI18n();
-  const isXs = isXsPrecisionModel(model);
-  const rapidTriggerValues = rapidTriggerValuesForModel(model);
-  const minRt = isXs ? 0.005 : 0.01;
+  const lim = limits ?? travelLimitsForModel(model);
+  const rapidTriggerValues = lim.rtValues;
+  const minRt = lim.rtMin;
   return (
     <div className="page quick-page page-enter">
       <section className="keyboard-stage">
@@ -204,9 +207,9 @@ function QuickSettingsPage({
             </div>
             <VerticalRangeControl
               value={actuation}
-              min={0.1}
-              max={3.4}
-              step={isXs ? 0.005 : 0.01}
+              min={lim.actuationMin}
+              max={lim.actuationMax}
+              step={lim.step}
               dragStep={0.05}
               suffix="mm"
               disabled={!hasSelection}
@@ -259,8 +262,8 @@ function QuickSettingsPage({
                 <RangeControl
                   value={rapidSensitivity}
                   min={minRt}
-                  max={3.4}
-                  step={isXs ? 0.005 : 0.01}
+                  max={lim.rtMax}
+                  step={lim.step}
                   dragStep={0.01}
                   allowedValues={rapidTriggerValues}
                   suffix="mm"
@@ -283,8 +286,8 @@ function QuickSettingsPage({
                   <RangeControl
                     value={pressSensitivity}
                     min={minRt}
-                    max={3.4}
-                    step={isXs ? 0.005 : 0.01}
+                    max={lim.rtMax}
+                    step={lim.step}
                     dragStep={0.01}
                     allowedValues={rapidTriggerValues}
                     suffix="mm"
@@ -305,8 +308,8 @@ function QuickSettingsPage({
                   <RangeControl
                     value={releaseSensitivity}
                     min={minRt}
-                    max={3.4}
-                    step={isXs ? 0.005 : 0.01}
+                    max={lim.rtMax}
+                    step={lim.step}
                     dragStep={0.01}
                     allowedValues={rapidTriggerValues}
                     suffix="mm"
@@ -353,8 +356,8 @@ function QuickSettingsPage({
               <VerticalRangeControl
                 value={topDeadzone}
                 min={0}
-                max={1}
-                step={isXs ? 0.005 : 0.01}
+                max={lim.deadzoneMax}
+                step={lim.step}
                 suffix="mm"
                 disabled={!deadzoneControlsEnabled}
                 mixed={topDeadzoneMixed}
@@ -367,8 +370,8 @@ function QuickSettingsPage({
               <VerticalRangeControl
                 value={bottomDeadzone}
                 min={0}
-                max={1}
-                step={isXs ? 0.005 : 0.01}
+                max={lim.deadzoneMax}
+                step={lim.step}
                 suffix="mm"
                 disabled={!deadzoneControlsEnabled}
                 mixed={bottomDeadzoneMixed}

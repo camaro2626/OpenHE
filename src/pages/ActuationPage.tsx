@@ -7,7 +7,7 @@ import Hero68Preview from '../components/Hero68Preview';
 import FeatureHelp from '../components/FeatureHelp';
 import type { HeroDeviceModelId } from '../keyboard/devices';
 import type { AdvancedBinding } from '../protocol/hero68/advanced';
-import { hallKeyLabel, isXsPrecisionModel } from '../app/helpers';
+import { hallKeyLabel, travelLimitsForModel, type TravelLimits } from '../app/helpers';
 import type { SwitchOption } from '../app/switchAssets';
 import { SwitchSimPreview } from '../app/components/SwitchSimPreview';
 import { Toggle } from '../app/components/Toggle';
@@ -15,6 +15,8 @@ import { VerticalRangeControl } from '../app/components/VerticalRangeControl';
 import { RangeControl } from '../app/components/RangeControl';
 export interface ActuationPageProps {
   model: HeroDeviceModelId;
+  /** Slider limits; OpenAula's defaults for the model when absent. */
+  limits?: TravelLimits;
   actuationPreviewWidth: number | undefined;
   advancedBindings: AdvancedBinding[];
   selectedKeys: Set<string>;
@@ -71,6 +73,7 @@ export interface ActuationPageProps {
 }
 function ActuationPage({
   model,
+  limits,
   actuationPreviewWidth,
   advancedBindings,
   selectedKeys,
@@ -99,6 +102,7 @@ function ActuationPage({
   actuationHallThresholdMm,
   releasePoint
 }: ActuationPageProps) {
+  const lim = limits ?? travelLimitsForModel(model);
   const { tr } = useI18n();
   const [cardHovered, setCardHovered] = useState(false);
   const resolvedPreviewWidth =
@@ -214,9 +218,9 @@ function ActuationPage({
             <div className="actuation-distance-control source-actuation-slider actuation-page-slider">
               <VerticalRangeControl
                 value={actuation}
-                min={0.1}
-                max={3.4}
-                step={isXsPrecisionModel(model) ? 0.005 : 0.01}
+                min={lim.actuationMin}
+                max={lim.actuationMax}
+                step={lim.step}
                 dragStep={0.05}
                 suffix="mm"
                 direction="top"
@@ -227,11 +231,11 @@ function ActuationPage({
               />
               <div className="actuation-distance-labels">
                 <span>
-                  <b>0.10 mm</b>
+                  <b>{lim.actuationMin.toFixed(2)} mm</b>
                   <small>{tr('Shallow')}</small>
                 </span>
                 <span>
-                  <b>3.40 mm</b>
+                  <b>{lim.actuationMax.toFixed(2)} mm</b>
                   <small>{tr('Deep')}</small>
                 </span>
               </div>

@@ -65,6 +65,35 @@ export function isXsPrecisionModel(model?: HeroDeviceModelId | string | null): b
   return getHero68DistanceUnitMm() === 0.005;
 }
 
+/**
+ * Slider limits for the performance pages (after OpenAula 1.9's
+ * travelLimitsForModel). Driver-backed boards pass their own from the
+ * driver's capabilities; without them, OpenAula's AULA defaults.
+ */
+export type TravelLimits = {
+  actuationMin: number;
+  actuationMax: number;
+  rtMin: number;
+  rtMax: number;
+  deadzoneMax: number;
+  step: number;
+  /** Discrete values sensitivity snaps to; none snaps to `step`. */
+  rtValues?: readonly number[];
+};
+
+export function travelLimitsForModel(model?: HeroDeviceModelId | string | null): TravelLimits {
+  const xs = isXsPrecisionModel(model);
+  return {
+    actuationMin: 0.1,
+    actuationMax: 3.4,
+    rtMin: xs ? 0.005 : 0.01,
+    rtMax: 3.4,
+    deadzoneMax: 1,
+    step: xs ? 0.005 : 0.01,
+    rtValues: rapidTriggerValuesForModel(model)
+  };
+}
+
 export function rapidTriggerValuesForModel(
   model?: HeroDeviceModelId | string | null
 ): readonly number[] {

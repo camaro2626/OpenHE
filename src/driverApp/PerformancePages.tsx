@@ -10,6 +10,7 @@ import { useMemo, useState } from 'react';
 import { Toggle } from '../app/components/Toggle';
 import { switchOptionsForModel, type SwitchOption } from '../app/switchAssets';
 import type { KeyboardDriver } from '../drivers/types';
+import type { TravelLimits } from '../app/helpers';
 import { ActuationPage } from '../pages/ActuationPage';
 import { QuickSettingsPage } from '../pages/QuickSettingsPage';
 import { RapidPage } from '../pages/RapidPage';
@@ -114,9 +115,27 @@ function ReadOnlyNotice({ driver }: { driver: KeyboardDriver }) {
   );
 }
 
-function perfPageProps(perf: OpenAulaPerformance) {
+/** Slider limits from what the board reports, instead of OpenAula's 0.1..3.4 mm. */
+export function driverLimits(driver: KeyboardDriver): TravelLimits {
+  const c = driver.capabilities;
+  const step = c.travelStepMm > 0 ? c.travelStepMm : 0.01;
+  const round = (v: number) => Math.round(v / step) * step;
+  const actuationMin = c.ranges?.actuation?.min ?? Math.max(0.1, step);
+  const actuationMax = c.ranges?.actuation?.max ?? round(c.travelMm);
+  return {
+    actuationMin,
+    actuationMax,
+    rtMin: c.ranges?.rapidTrigger?.min ?? step,
+    rtMax: c.ranges?.rapidTrigger?.max ?? actuationMax,
+    deadzoneMax: c.ranges?.deadzone?.max ?? 1,
+    step
+  };
+}
+
+function perfPageProps(perf: OpenAulaPerformance, driver: KeyboardDriver) {
   return {
     model: perf.model,
+    limits: driverLimits(driver),
     advancedBindings: [],
     selectedKeys: perf.selectedKeys,
     toggleKey: perf.toggleKey,
@@ -167,7 +186,7 @@ export function DriverQuickPage(props: Props & { sw?: SwitchSetupState }) {
     <div className={capClasses(driver)}>
       <ReadOnlyNotice driver={driver} />
       <QuickSettingsPage
-        {...perfPageProps(perf)}
+        {...perfPageProps(perf, driver)}
         actuationByKey={perf.actuationByKey}
         selectedSwitch={selectedSwitch}
         switchProfileMixed={switchMixed}
@@ -192,7 +211,7 @@ export function DriverRapidPage(props: Props) {
     <div className={capClasses(driver)}>
       <ReadOnlyNotice driver={driver} />
       <RapidPage
-        {...perfPageProps(perf)}
+        {...perfPageProps(perf, driver)}
         rapidTriggerByKey={perf.rapidTriggerByKey}
         continuous={
           caps.continuousRapidTrigger
@@ -260,6 +279,7 @@ export function DriverActuationPage(props: Props & { hall: Hall; sw?: SwitchSetu
       <ReadOnlyNotice driver={driver} />
       <ActuationPage
         model={perf.model}
+        limits={driverLimits(driver)}
         actuationPreviewWidth={previewWidth}
         setActuationPreviewWidth={setPreviewWidth}
         advancedBindings={[]}
