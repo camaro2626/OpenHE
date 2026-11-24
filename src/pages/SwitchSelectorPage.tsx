@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { SelectionActions } from '../app/components/SelectionActions';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Search } from 'lucide-react';
@@ -32,6 +33,8 @@ export type SwitchSelectorPageProps = {
   canRedo?: boolean;
   onUndo?: () => void;
   onRedo?: () => void;
+  /** More settings below the switch list, in the page's own column. */
+  children?: ReactNode;
 };
 export function SwitchSelectorPage({
   model,
@@ -57,7 +60,8 @@ export function SwitchSelectorPage({
   canUndo = false,
   canRedo = false,
   onUndo,
-  onRedo
+  onRedo,
+  children
 }: SwitchSelectorPageProps) {
   const tr = useT();
   const [brandMenuOpen, setBrandMenuOpen] = useState(false);
@@ -252,6 +256,7 @@ export function SwitchSelectorPage({
           </div>
         </article>
       </section>
+      {children}
     </div>
   );
 }

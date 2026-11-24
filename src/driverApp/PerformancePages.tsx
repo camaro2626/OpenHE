@@ -286,32 +286,19 @@ export function DriverActuationPage(props: Props & { hall: Hall; sw?: SwitchSetu
         actuationHallTravelPercent={f.travelPercent}
         actuationHallThresholdPercent={f.thresholdPercent}
         actuationHallThresholdMm={f.thresholdMm}
+        releasePoint={
+          driver.capabilities.releasePoint
+            ? {
+                value: perf.release,
+                mixed: perf.releaseMixed,
+                onChange: perf.setReleaseForSelection,
+                min: Math.max(driver.capabilities.travelStepMm, 0.1),
+                max: driver.capabilities.ranges?.actuation?.max ?? driver.capabilities.travelMm,
+                step: Math.max(driver.capabilities.travelStepMm, 0.01)
+              }
+            : undefined
+        }
       />
-      {driver.capabilities.releasePoint && (
-        <section className="drv-openaula-extra">
-          <article className={`setting-card ${!perf.hasSelection ? 'is-unavailable' : ''}`}>
-            <div className="card-head compact-head">
-              <div>
-                <h2>Release point</h2>
-                <p>
-                  With Rapid Trigger off, the key lets go when it rises above this depth. Set it
-                  just above the actuation point for a quick release, or higher to avoid chatter.
-                </p>
-              </div>
-            </div>
-            <RangeControl
-              value={perf.release}
-              min={driver.capabilities.travelStepMm}
-              max={driver.capabilities.ranges?.actuation?.max ?? driver.capabilities.travelMm}
-              step={Math.max(driver.capabilities.travelStepMm, 0.01)}
-              suffix="mm"
-              disabled={!perf.hasSelection || props.busy}
-              onChange={perf.setReleaseForSelection}
-            />
-            {perf.releaseMixed && <p className="drv-muted">The selected keys differ.</p>}
-          </article>
-        </section>
-      )}
       <ActuationSave {...props} />
     </div>
   );

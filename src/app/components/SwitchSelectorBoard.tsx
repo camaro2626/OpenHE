@@ -275,43 +275,52 @@ function SwitchSelectorBoard({
       <div ref={boardRef} className="switch-board-preview" style={{ position: 'relative' }}>
         {rows.map((row, rowIndex) => (
           <div className="switch-board-row" key={rowIndex}>
-            {row.map(key => (
-              <button
-                key={key.id}
-                type="button"
-                data-key-id={key.id}
-                className={`switch-board-key ${selectedKeys.has(key.id) ? 'is-selected' : ''}`}
-                style={keyUnits(key.width ?? 1)}
-                onClick={event => {
-                  if (suppressNextClickRef.current) {
-                    suppressNextClickRef.current = false;
-                    event.preventDefault();
-                    return;
-                  }
-                  if (event.detail > 0) {
-                    event.currentTarget.blur();
-                  }
-                  onToggleKey(key.id);
-                }}
-                aria-label={key.label}
-              >
-                {switchImagesByKey[key.id] ? (
-                  <img
-                    src={switchImagesByKey[key.id]}
-                    alt=""
-                    aria-hidden="true"
-                    className="switch-board-switch"
-                  />
-                ) : (
-                  <span className="switch-board-generic" aria-hidden="true">
-                    <SwitchStemMenuIcon />
+            {row.map(key =>
+              key.spacer ? (
+                <span
+                  key={key.id}
+                  className="switch-board-key is-spacer"
+                  style={keyUnits(key.width ?? 1)}
+                  aria-hidden="true"
+                />
+              ) : (
+                <button
+                  key={key.id}
+                  type="button"
+                  data-key-id={key.id}
+                  className={`switch-board-key ${selectedKeys.has(key.id) ? 'is-selected' : ''}`}
+                  style={keyUnits(key.width ?? 1)}
+                  onClick={event => {
+                    if (suppressNextClickRef.current) {
+                      suppressNextClickRef.current = false;
+                      event.preventDefault();
+                      return;
+                    }
+                    if (event.detail > 0) {
+                      event.currentTarget.blur();
+                    }
+                    onToggleKey(key.id);
+                  }}
+                  aria-label={key.label}
+                >
+                  {switchImagesByKey[key.id] ? (
+                    <img
+                      src={switchImagesByKey[key.id]}
+                      alt=""
+                      aria-hidden="true"
+                      className="switch-board-switch"
+                    />
+                  ) : (
+                    <span className="switch-board-generic" aria-hidden="true">
+                      <SwitchStemMenuIcon />
+                    </span>
+                  )}
+                  <span className="switch-board-key-label" aria-hidden="true">
+                    {key.label}
                   </span>
-                )}
-                <span className="switch-board-key-label" aria-hidden="true">
-                  {key.label}
-                </span>
-              </button>
-            ))}
+                </button>
+              )
+            )}
           </div>
         ))}
       </div>

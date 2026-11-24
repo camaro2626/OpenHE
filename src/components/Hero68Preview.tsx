@@ -680,7 +680,12 @@ export default function Hero68Preview({
                       : 0;
                   if (key.spacer) {
                     return (
-                      <div className="hero-key-slot is-spacer" key={key.id} aria-hidden="true" />
+                      <div
+                        className="hero-key-slot is-spacer"
+                        key={key.id}
+                        aria-hidden="true"
+                        style={{ '--key-units': key.width ?? 1 } as React.CSSProperties}
+                      />
                     );
                   }
                   return (

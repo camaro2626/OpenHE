@@ -12,6 +12,7 @@ import type { SwitchOption } from '../app/switchAssets';
 import { SwitchSimPreview } from '../app/components/SwitchSimPreview';
 import { Toggle } from '../app/components/Toggle';
 import { VerticalRangeControl } from '../app/components/VerticalRangeControl';
+import { RangeControl } from '../app/components/RangeControl';
 export interface ActuationPageProps {
   model: HeroDeviceModelId;
   actuationPreviewWidth: number | undefined;
@@ -56,6 +57,15 @@ export interface ActuationPageProps {
   deadzoneEnabled?: boolean;
   topDeadzone?: number;
   bottomDeadzone?: number;
+  /** Release point with Rapid Trigger off, where the board has one (RongYuan, Sparklink). */
+  releasePoint?: {
+    value: number;
+    mixed: boolean;
+    onChange: (value: number) => void;
+    min: number;
+    max: number;
+    step: number;
+  };
 }
 function ActuationPage({
   model,
@@ -84,7 +94,8 @@ function ActuationPage({
   actuationHallTravelMm,
   actuationHallTravelPercent,
   actuationHallThresholdPercent,
-  actuationHallThresholdMm
+  actuationHallThresholdMm,
+  releasePoint
 }: ActuationPageProps) {
   const { tr } = useI18n();
   const [cardHovered, setCardHovered] = useState(false);
@@ -224,6 +235,31 @@ function ActuationPage({
               </div>
             </div>
           </div>
+          {releasePoint && (
+            <div className="rapid-sensitivity-control actuation-release-control">
+              <div className="rapid-control-label">
+                {tr('RELEASE POINT')}{' '}
+                <FeatureHelp
+                  title="Release point"
+                  paragraphs={[
+                    'With Rapid Trigger off, the key lets go when it rises above this depth.',
+                    'Set it just above the actuation point for a quick release, or higher to avoid chatter. Rapid Trigger keys ignore it.'
+                  ]}
+                />
+              </div>
+              <RangeControl
+                value={releasePoint.value}
+                min={releasePoint.min}
+                max={releasePoint.max}
+                step={releasePoint.step}
+                dragStep={0.05}
+                suffix="mm"
+                mixed={releasePoint.mixed}
+                disabled={!hasSelection}
+                onChange={releasePoint.onChange}
+              />
+            </div>
+          )}
         </article>
 
         <article

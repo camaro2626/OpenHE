@@ -117,71 +117,71 @@ export function SwitchesPage({
         profileBusy={busy}
         saveState={justSaved && !sw.dirty ? 'sent' : 'idle'}
         onSave={() => void save()}
-      />
-
-      {current?.tunable && tuning && inUse.has(current.id) && (
-        <section className="drv-openaula-extra">
-          <article className="setting-card drv-switch-tuning">
-            <div className="card-head compact-head">
-              <h2>{current.name}: travel and curve</h2>
-              <p>
-                Apply to every key with this switch. Travel is the switch's full stroke; the curve
-                shapes how sensor readings turn into millimetres (0 = linear, higher bends the top
-                of the stroke). Set travel from the switch's spec sheet, then check with Hall Stream
-                that a full press reads the full travel.
-              </p>
-            </div>
-            <div className="drv-field">
-              <div className="drv-field-head">
-                <span>Full travel</span>
+      >
+        {current?.tunable && tuning && inUse.has(current.id) && (
+          <section className="switch-assignment-grid">
+            <article className="settings-card switch-assignment-card drv-switch-tuning">
+              <div className="settings-card-head">
+                <h2>{current.name}: travel and curve</h2>
+                <p>
+                  Apply to every key with this switch. Travel is the switch's full stroke; the curve
+                  shapes how sensor readings turn into millimetres (0 = linear, higher bends the top
+                  of the stroke). Set travel from the switch's spec sheet, then check with Hall
+                  Stream that a full press reads the full travel.
+                </p>
               </div>
-              <RangeControl
-                value={tuning.travelMm}
-                min={1}
-                max={6}
-                step={0.01}
-                suffix="mm"
-                disabled={busy}
-                onChange={v =>
-                  sw.setDraft({
-                    ...draft,
-                    tuning: { ...draft.tuning, [current.id]: { ...tuning, travelMm: v } }
-                  })
-                }
-              />
-            </div>
-            <div className="drv-field">
-              <div className="drv-field-head">
-                <span>Travel curve</span>
-                <small>{(tuning.curve / 10).toFixed(1)} (0 = linear)</small>
+              <div className="drv-field">
+                <div className="drv-field-head">
+                  <span>Full travel</span>
+                </div>
+                <RangeControl
+                  value={tuning.travelMm}
+                  min={1}
+                  max={6}
+                  step={0.01}
+                  suffix="mm"
+                  disabled={busy}
+                  onChange={v =>
+                    sw.setDraft({
+                      ...draft,
+                      tuning: { ...draft.tuning, [current.id]: { ...tuning, travelMm: v } }
+                    })
+                  }
+                />
               </div>
-              <input
-                type="range"
-                className="drv-curve-range"
-                min={0}
-                max={100}
-                step={1}
-                value={tuning.curve}
-                disabled={busy}
-                onChange={e =>
-                  sw.setDraft({
-                    ...draft,
-                    tuning: {
-                      ...draft.tuning,
-                      [current.id]: { ...tuning, curve: Number(e.target.value) }
-                    }
-                  })
-                }
-              />
-            </div>
-            {limit && (
-              <p className="drv-muted">
-                {inUse.size} of {limit} switch types in use on this keyboard.
-              </p>
-            )}
-          </article>
-        </section>
-      )}
+              <div className="drv-field">
+                <div className="drv-field-head">
+                  <span>Travel curve</span>
+                  <small>{(tuning.curve / 10).toFixed(1)} (0 = linear)</small>
+                </div>
+                <input
+                  type="range"
+                  className="drv-curve-range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={tuning.curve}
+                  disabled={busy}
+                  onChange={e =>
+                    sw.setDraft({
+                      ...draft,
+                      tuning: {
+                        ...draft.tuning,
+                        [current.id]: { ...tuning, curve: Number(e.target.value) }
+                      }
+                    })
+                  }
+                />
+              </div>
+              {limit && (
+                <p className="drv-muted">
+                  {inUse.size} of {limit} switch types in use on this keyboard.
+                </p>
+              )}
+            </article>
+          </section>
+        )}
+      </SwitchSelectorPage>
 
       <SaveBar
         dirty={sw.dirty}

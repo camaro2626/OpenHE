@@ -881,13 +881,6 @@
 .drv-openaula-notice {
   margin: 16px var(--page-inline-pad) 0;
 }
-.drv-openaula-extra {
-  padding: 0 var(--page-inline-pad) 32px;
-  max-width: var(--content-width);
-}
-.drv-openaula-extra .setting-card {
-  max-width: 560px;
-}
 
 /* OpenAula keyboard preview inside OpenHE's own pages */
 .drv-content .drv-stage {
@@ -912,6 +905,7 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+  margin-top: 12px;
 }
 
 .drv-macro-steps {
@@ -960,12 +954,15 @@
   align-items: baseline;
   gap: 14px;
 }
-.drv-openaula-extra .setting-card {
-  min-height: 0;
-  height: auto;
-}
 .drv-sleep-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px 24px;
+}
+
+/* Hall Stream: the keyboard sits on the page like every other page, not in a box */
+.drv-openaula .stream-keyboard-stage {
+  border: 0;
+  background: none;
+  margin-bottom: 12px;
 }
