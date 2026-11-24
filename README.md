@@ -28,9 +28,12 @@ OpenHE grew out of [OpenAula](https://github.com/shizunavn/OpenAula) and keeps i
 | --- | --- | --- |
 | **OpenHE firmware** | Keyboards running OpenHE's own firmware, built on [libhmk](https://github.com/peppapighs/libhmk) (see [gk68tmr_firmware](https://github.com/camaro2626/gk68tmr_firmware)), starting with the Skyloong GK68 TMR. The board reports its own layout, so no per-board setup is needed. It is not hmkconf-compatible: the firmware has its own actuation model (0.01 mm steps, dead zones, OpenAula-style rapid trigger) and its own HID usage page. | Keymap, actuation, rapid trigger, dead zones, advanced keys, macros, switch profiles, live travel, calibration, gamepad |
 | **RongYuan** | About 770 magnetic boards on RongYuan firmware, sold under Akko, MonsGeek, AttackShark, Epomaker, Hator, Ajazz, YUNZII and many other names. Board list, layouts and protocol from [sharkfin](https://github.com/dniminenn/sharkfin). | Keymap, Fn layer, macros, lighting and board settings on all of them; switch settings and SOCD / dynamic keystroke / tap-hold / toggle read on all, **written** on the ry5088 and yc3121 firmware lines (the ones whose write path is verified) |
+| **Sparklink** (early) | About 550 USB ids on Sparklink's (星闪悦动) magnetic-keyboard firmware, protocol v2: IROK, EWEADN, CAROTMAS, Everglide SU75 Pro, Weikav EG75 HE, AULA AG75, Wuque Studio and many more. Ported from Sparklink's own MIT-licensed protocol source. | Keymap (4 layers), actuation, rapid trigger (continuous or not), release point, dead zones, live travel, profiles, report rate. Advanced keys, macros and lighting not yet. |
 | **AULA** | HERO 68, HERO 84, HERO 68 XS, WIN 68 HE MAX | Through the original OpenAula app, linked from the start screen |
 
 RongYuan boards are identified by the ID the board reports, not by USB product ID (many unrelated boards share `3151:5030`). A board missing from the list is reported as such; nothing is guessed.
+
+Sparklink boards are only ever talked to when their USB id is on Sparklink's own keyboard list: the protocol's first request means something else to other vendors' firmware (a reset on SteelSeries' Apex Pro), so a vendor usage page alone is never enough. The board then describes itself: name, firmware, features and its key layout.
 
 ## Features
 
@@ -93,9 +96,10 @@ Each keyboard family is a **driver** in `src/drivers/` behind one interface (`Ke
 
 - `src/drivers/openhe/` speaks the OpenHE firmware's raw HID protocol (usage page `0xFF48`, libhmk's command set with OpenHE's actuation records). The board identifies itself with an `OPHE` signature; name, sizes, layout and default keymap come from its own metadata.
 - `src/drivers/rongyuan/` is a TypeScript port of sharkfin's protocol: 64-byte feature reports on `0xFFFF`, both command families (gen2 and yc500), the magnetic switch columns, write pacing and the 2.4 GHz receiver relay. It writes only what sharkfin writes, with the same spacing between flash writes. `scripts/rongyuan-boards.py` regenerates the bundled board list and light tables from a sharkfin checkout.
+- `src/drivers/sparklink/` speaks Sparklink's protocol v2 (64-byte reports on usage page `0xFFB0`), ported from the vendor's own MIT-licensed source (`LICENSES/MIT-sparklink.txt`). Firmware-upgrade commands are left out.
 - `src/driverApp/` is the workspace UI for driver-backed boards. The connected board is registered as an OpenAula board model, so OpenAula's own Quick Settings, Actuation Point, Rapid Trigger, Hall Stream, Switch Selector and Macros pages and keyboard preview draw it.
 
-Both drivers are tested in `tests/openhe-driver.test.mjs` and `tests/rongyuan-driver.test.mjs` against software boards built from the firmware sources and protocol notes.
+The drivers are tested in `tests/openhe-driver.test.mjs`, `tests/rongyuan-driver.test.mjs` and `tests/sparklink-driver.test.mjs` against software boards built from the firmware sources and protocol notes.
 
 ## AULA keyboards (OpenAula)
 
@@ -139,6 +143,7 @@ src/
     keycodes.ts      Shared UI keycode space
     openhe/          OpenHE firmware driver
     rongyuan/        RongYuan driver (sharkfin port) and bundled board list/layouts
+    sparklink/       Sparklink driver (vendor protocol v2 port) and its keyboard id list
   driverApp/         OpenHE workspace: shell, pages, start screen
   App.tsx, app/, pages/, components/, keyboard/, protocol/, state/
                      The OpenAula app (AULA boards)
@@ -153,5 +158,7 @@ service/, landing/, functions/, worker/
 - [OpenAula](https://github.com/shizunavn/OpenAula) by shizunavn: the app, interface and AULA support this project started from (Apache-2.0, see `LICENSES/Apache-2.0.txt`).
 - [sharkfin](https://github.com/dniminenn/sharkfin) by JR Lanteigne: the RongYuan protocol, board list and layouts the RongYuan driver is ported from (GPL-3.0-or-later).
 - [libhmk](https://github.com/peppapighs/libhmk) by peppapighs: the firmware OpenHE's firmware is built on.
+- [Sparklink / 星闪悦动](https://github.com/sparklinkplayjoy/keyboard-docs): the keyboard protocol and key names the Sparklink driver is ported from (MIT, `LICENSES/MIT-sparklink.txt`).
+- [HallJoy](https://github.com/PashOK7/HallJoy) by PashOK7: the research behind the Sparklink keyboard id list and its safety rules.
 
 OpenHE as a whole is distributed under the **GNU General Public License v3.0 or later** (`LICENSE`). Files carried over from OpenAula remain available under Apache-2.0 as well.

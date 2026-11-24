@@ -21,6 +21,11 @@ const FAMILIES = [
       'Keyboards running OpenHE’s own firmware (built on libhmk), starting with the Skyloong GK68 TMR. Actuation in 0.01 mm steps, dead zones, gamepad mode; the board describes its own layout.'
   },
   {
+    name: 'Sparklink magnetic boards',
+    detail:
+      'About 550 boards on Sparklink’s firmware (protocol v2), from its own published protocol: IROK, EWEADN, CAROTMAS, Everglide, Weikav, AULA AG75 and more. Early support: keymap, actuation, rapid trigger, live travel.'
+  },
+  {
     name: 'RongYuan magnetic boards',
     detail:
       'About 770 Hall-effect boards on RongYuan firmware (ry5088 and yc3121 lines), from the board list sharkfin keeps. Many sold by Akko, MonsGeek, AttackShark, Epomaker and others.'

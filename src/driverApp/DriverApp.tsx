@@ -71,6 +71,12 @@ type KeyboardPage =
   | 'gamepad';
 type SettingsPage = 'general' | 'switches' | 'profiles' | 'calibration' | 'device';
 
+const FAMILY_NAME: Partial<Record<KeyboardDriver['id'], string>> = {
+  openhe: 'OpenHE',
+  rongyuan: 'RongYuan',
+  sparklink: 'Sparklink'
+};
+
 type NavItem<T> = { id: T; label: string; icon: ReactNode; show: boolean };
 
 /** Workspace for boards behind the driver layer (OpenHE firmware, RongYuan), laid out like OpenAula. */
@@ -363,7 +369,7 @@ export function DriverApp({ driver }: { driver: KeyboardDriver }) {
                 {driver.info.name}
               </strong>
               <small className="drv-device-meta">
-                {driver.id === 'openhe' ? 'OpenHE' : 'RongYuan'} · fw {driver.info.firmwareVersion}
+                {FAMILY_NAME[driver.id] ?? driver.id} · fw {driver.info.firmwareVersion}
               </small>
             </span>
           </div>

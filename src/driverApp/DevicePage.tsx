@@ -39,7 +39,13 @@ export function DevicePage({
           <dt>Name</dt>
           <dd>{info.name}</dd>
           <dt>Driver</dt>
-          <dd>{driver.id === 'openhe' ? 'openhe' : 'RongYuan (sharkfin protocol)'}</dd>
+          <dd>
+            {driver.id === 'openhe'
+              ? 'openhe'
+              : driver.id === 'sparklink'
+                ? 'Sparklink (vendor protocol v2)'
+                : 'RongYuan (sharkfin protocol)'}
+          </dd>
           <dt>Firmware</dt>
           <dd>{info.firmwareVersion}</dd>
           <dt>USB</dt>

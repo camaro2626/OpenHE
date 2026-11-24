@@ -1,0 +1,299 @@
+/**
+ * Sparklink (星闪悦动) keyboard protocol, v2: 64-byte output reports on usage
+ * page 0xFFB0, usage 1; each answered by one 64-byte input report that echoes
+ * the group and sub-command in bytes 0..1, data from byte 2.
+ *
+ * Ported from Sparklink's own MIT-licensed protocol source,
+ * @sparklinkplayjoy/protocol-keyboard-v2 1.0.24 (constants/byte.ts,
+ * constants/globalByte.ts, pack/*.ts, recdata/*.ts); MIT license, see
+ * LICENSES/MIT-sparklink.txt. Firmware-upgrade commands (group 0x08) are
+ * deliberately not here.
+ */
+
+export const SL_USAGE_PAGE = 0xffb0;
+export const SL_USAGE = 0x01;
+export const SL_REPORT_LEN = 64;
+/** Keys per layout row in every row-addressed command. */
+export const SL_COLS = 21;
+/** Rows OpenHE asks a board about (the protocol addresses up to 8). */
+export const SL_MAX_ROWS = 8;
+/** Base layer plus Fn1..Fn3. */
+export const SL_LAYERS = 4;
+
+export const Group = {
+  DEVICE: 0x01,
+  GLOBAL: 0x02,
+  LAYOUT: 0x03,
+  PERFORMANCE: 0x04,
+  LIGHTING: 0x05,
+  HIGHER_KEY: 0x06,
+  MACRO: 0x07
+} as const;
+
+export const DeviceCmd = { PROTOCOL: 0x01, INFO: 0x02, FEATURE: 0x03 } as const;
+
+export const LayoutCmd = {
+  GET_ROW: 0x01,
+  SET_ROW: 0x02,
+  GET_KEY: 0x03,
+  SET_KEY: 0x04,
+  GET_STYLE: 0x05,
+  GET_DEFAULT: 0x06
+} as const;
+
+export const PerfCmd = { GET: 0x01, SET: 0x02, AXIS_DATA: 0x03 } as const;
+export const AxisData = { ADC: 0x00, ROUTE: 0x01, CALIBRATE: 0x02, KEY_STATUS: 0x03 } as const;
+/** Trigger mode: plain, Rapid Trigger, Rapid Trigger with continuous off ("interval RT"). */
+export const TriggerMode = { NORMAL: 0x00, RT: 0x01, INTERVAL_RT: 0x02 } as const;
+
+export const GlobalCmd = {
+  RESET: 0x01,
+  SAVE: 0x02,
+  CONFIG: 0x03,
+  SYSTEM: 0x04,
+  REPORT_RATE: 0x05,
+  CALIBRATION: 0x06,
+  AXIS_LIBRARY: 0x07,
+  RT_PRECISION: 0x0c
+} as const;
+/** Read list / read / write, the third byte of global reads and writes. */
+export const CRW = { LIST: 0x00, READ: 0x01, WRITE: 0x02 } as const;
+/** What a save (or a factory reset) covers. */
+export const Area = {
+  ALL: 0x00,
+  CALIBRATION: 0x01,
+  PERFORMANCE: 0x02,
+  LIGHTING: 0x03,
+  LAYOUT: 0x04,
+  HIGHER_KEY: 0x05,
+  MACRO: 0x06,
+  AXIS: 0x07
+} as const;
+/** Report-rate codes, highest first. */
+export const REPORT_RATES_HZ = [8000, 4000, 2000, 1000, 500, 250, 125] as const;
+
+export function packet(bytes: readonly number[]): Uint8Array {
+  const buf = new Uint8Array(SL_REPORT_LEN);
+  buf.set(bytes.slice(0, SL_REPORT_LEN).map(b => b & 0xff));
+  return buf;
+}
+
+const u16 = (d: Uint8Array, at: number) => d[at] | (d[at + 1] << 8);
+const le16 = (v: number) => [v & 0xff, (v >> 8) & 0xff];
+
+// ------------------------------------------------------------ device
+
+export type SlDeviceInfo = {
+  type: number;
+  subType: number;
+  boardId: number;
+  appVersion: string;
+  pcbVersion: string;
+  serial: string;
+  buildDate: string;
+};
+
+export function parseDeviceInfo(d: Uint8Array): SlDeviceInfo {
+  const boardId = ((d[4] << 24) | (d[5] << 16) | (d[6] << 8) | d[7]) >>> 0;
+  return {
+    type: d[2],
+    subType: d[3],
+    boardId,
+    appVersion: Array.from(d.subarray(8, 12)).join('.'),
+    pcbVersion: Array.from(d.subarray(12, 16)).join('-'),
+    serial: Array.from(d.subarray(17, 29)).join(''),
+    buildDate: new TextDecoder().decode(d.subarray(29, 41).filter(b => b !== 0))
+  };
+}
+
+export type SlFeatures = {
+  magnetic: boolean;
+  magnetic3d: boolean;
+  wireless: boolean;
+  rgb: boolean;
+  knob: boolean;
+  screen: boolean;
+  gamepad: boolean;
+};
+
+export function parseFeatures(d: Uint8Array): SlFeatures {
+  return {
+    magnetic: !!(d[2] & 0x02),
+    magnetic3d: !!(d[2] & 0x10),
+    wireless: !!(d[3] & 0x06),
+    rgb: !!(d[4] & 0x01),
+    knob: !!(d[4] & 0x02),
+    screen: !!(d[5] & 0x03),
+    gamepad: !!(d[5] & 0x20)
+  };
+}
+
+// ------------------------------------------------------------ layout
+
+export type SlKeyStyle = {
+  /** Position in key units (the wire carries quarter units). */
+  row: number;
+  col: number;
+  /** Width code: 0 none, 1 1u, 2 1.25u ... 9 6.25u, 10 a 2u-tall key, 12 knob, 13..15 screen. */
+  ratio: number;
+};
+
+/** Width in key units by width code (protocol-keyboard-v2's KeyLayoutStyle). */
+export const KEY_WIDTH: Readonly<Record<number, number>> = {
+  1: 1,
+  2: 1.25,
+  3: 1.5,
+  4: 1.75,
+  5: 2,
+  6: 2.25,
+  7: 2.5,
+  8: 2.75,
+  9: 6.25,
+  10: 1
+};
+
+/** One row of key positions: 21 little-endian words, row:5 col:7 ratio:4. */
+export function parseStyleRow(d: Uint8Array): SlKeyStyle[] {
+  const out: SlKeyStyle[] = [];
+  for (let i = 0; i < SL_COLS; i++) {
+    const v = u16(d, 3 + i * 2);
+    out.push({ row: ((v >> 11) & 0x1f) / 4, col: ((v >> 4) & 0x7f) / 4, ratio: v & 0x0f });
+  }
+  return out;
+}
+
+/** One row of 21 keycodes, little-endian, from `from`. */
+export function parseKeycodeRow(d: Uint8Array, from = 4): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < SL_COLS; i++) out.push(u16(d, from + i * 2));
+  return out;
+}
+
+export const getStyleRow = (row: number) => packet([Group.LAYOUT, LayoutCmd.GET_STYLE, row]);
+export const getKeyRow = (layer: number, row: number) =>
+  packet([Group.LAYOUT, LayoutCmd.GET_ROW, layer, row]);
+export const setKeyRow = (layer: number, row: number, codes: readonly number[]) =>
+  packet([Group.LAYOUT, LayoutCmd.SET_ROW, layer, row, ...codes.flatMap(le16)]);
+/** Factory keymap: `system` 0 Windows, 1 macOS; `fn` the layer. */
+export const getDefaultRow = (fn: number, row: number, system = 0) =>
+  packet([Group.LAYOUT, LayoutCmd.GET_DEFAULT, ((system & 0x0f) << 4) | (fn & 0x0f), row]);
+
+// ------------------------------------------------------------ performance
+
+/** One key's trigger settings, micrometres on the wire. */
+export type SlPerformance = {
+  mode: number;
+  /** Actuation point with plain triggering. */
+  normalPress: number;
+  /** Release point with plain triggering. */
+  normalRelease: number;
+  /** Actuation point with Rapid Trigger. */
+  rtFirstTouch: number;
+  rtPress: number;
+  rtRelease: number;
+  /** Top dead zone. */
+  pressDead: number;
+  /** Bottom dead zone. */
+  releaseDead: number;
+  /** Switch id, calibration flag and switch calibration: written back as read. */
+  axis: number;
+  calibrate: number;
+  axisV2Id: number;
+  axisRangeMax: number;
+  axisCoefficient: number;
+};
+
+export const getPerformance = (row: number, col: number) =>
+  packet([Group.PERFORMANCE, PerfCmd.GET, row, col]);
+
+export function parsePerformance(d: Uint8Array): SlPerformance {
+  return {
+    mode: d[4],
+    normalPress: u16(d, 5),
+    normalRelease: u16(d, 7),
+    rtFirstTouch: u16(d, 9),
+    rtPress: u16(d, 11),
+    rtRelease: u16(d, 13),
+    pressDead: u16(d, 15),
+    releaseDead: u16(d, 17),
+    axis: d[19],
+    calibrate: d[20],
+    axisV2Id: u16(d, 21),
+    axisRangeMax: u16(d, 23),
+    axisCoefficient: u16(d, 25)
+  };
+}
+
+export function setPerformance(row: number, col: number, p: SlPerformance): Uint8Array {
+  const um = (v: number) => le16(Math.max(0, Math.min(0xffff, Math.round(v))));
+  return packet([
+    Group.PERFORMANCE,
+    PerfCmd.SET,
+    row,
+    col,
+    p.mode,
+    ...um(p.normalPress),
+    ...um(p.normalRelease),
+    ...um(p.rtFirstTouch),
+    ...um(p.rtPress),
+    ...um(p.rtRelease),
+    ...um(p.pressDead),
+    ...um(p.releaseDead),
+    p.axis,
+    p.calibrate,
+    ...le16(p.axisV2Id),
+    ...le16(p.axisRangeMax),
+    ...le16(p.axisCoefficient)
+  ]);
+}
+
+/** Live travel of one row, micrometres. */
+export const getRoute = (row: number) =>
+  packet([Group.PERFORMANCE, PerfCmd.AXIS_DATA, AxisData.ROUTE, row]);
+export const getAdc = (row: number) =>
+  packet([Group.PERFORMANCE, PerfCmd.AXIS_DATA, AxisData.ADC, row]);
+
+export function parseAxisRow(d: Uint8Array): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < SL_COLS; i++) out.push(u16(d, 4 + i * 2));
+  return out;
+}
+
+// ------------------------------------------------------------ global
+
+export const save = (area: number) => packet([Group.GLOBAL, GlobalCmd.SAVE, area]);
+export const factoryReset = (area: number = Area.ALL) =>
+  packet([Group.GLOBAL, GlobalCmd.RESET, area]);
+export const configList = () => packet([Group.GLOBAL, GlobalCmd.CONFIG, CRW.LIST]);
+export const configRead = () => packet([Group.GLOBAL, GlobalCmd.CONFIG, CRW.READ]);
+export const configWrite = (index: number) =>
+  packet([Group.GLOBAL, GlobalCmd.CONFIG, CRW.WRITE, index]);
+export const rateList = () => packet([Group.GLOBAL, GlobalCmd.REPORT_RATE, CRW.LIST]);
+export const rateRead = () => packet([Group.GLOBAL, GlobalCmd.REPORT_RATE, CRW.READ]);
+export const rateWrite = (code: number) =>
+  packet([Group.GLOBAL, GlobalCmd.REPORT_RATE, CRW.WRITE, code]);
+export const rtPrecision = () => packet([Group.GLOBAL, GlobalCmd.RT_PRECISION, 0x00]);
+export const calibration = (open: boolean) =>
+  packet([Group.GLOBAL, GlobalCmd.CALIBRATION, open ? 0x00 : 0x01]);
+
+/** `[count, codes...]` lists (profiles, report rates) start at byte 3. */
+export function parseList(d: Uint8Array): number[] {
+  return Array.from(d.subarray(4, 4 + d[3]));
+}
+
+// ------------------------------------------------------------ keycodes
+
+export const SL_NONE = 0x0000;
+export const SL_TRANSPARENT = 0x0001;
+/** 0xF101..0xF103: Fn1..Fn3. */
+export const SL_FN_BASE = 0xf100;
+/** 0x2xxx: consumer usage xxx. */
+export const SL_CONSUMER = 0x2000;
+/** Mouse buttons, high byte 0x41.. (left, right, middle, forward, back). */
+export const SL_MOUSE: Readonly<Record<number, number>> = {
+  0x4100: 1,
+  0x4200: 2,
+  0x4300: 3,
+  0x4400: 5,
+  0x4500: 4
+};

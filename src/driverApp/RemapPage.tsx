@@ -60,7 +60,13 @@ export function RemapPage({
   const dirty = !!draft && !!saved && draft.some((v, i) => v !== saved[i]);
   const fnLayer = layer > 0;
   const layerNames = Array.from({ length: driver.capabilities.layers }, (_, i) =>
-    i === 0 ? 'Base layer' : `Layer ${i}${driver.id === 'rongyuan' ? ' (Fn)' : ''}`
+    i === 0
+      ? 'Base layer'
+      : driver.id === 'rongyuan'
+        ? `Layer ${i} (Fn)`
+        : driver.id === 'sparklink'
+          ? `Fn${i} layer`
+          : `Layer ${i}`
   );
   const activeGroup = groups.find(g => g.id === category) ?? groups[0];
 

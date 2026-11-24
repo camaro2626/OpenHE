@@ -10,6 +10,7 @@ import {
   RY_HID_FILTERS,
   type FeatureHidDevice
 } from './rongyuan/connect';
+import { isSparklinkDevice, SL_HID_FILTERS, SparklinkDriver } from './sparklink/driver';
 import type { HidDeviceLike } from './transport';
 import { DriverError, type KeyboardDriver } from './types';
 
@@ -23,7 +24,11 @@ export function webHid(): NavigatorHid | null {
   return hid ?? null;
 }
 
-export const DRIVER_HID_FILTERS: object[] = [OPENHE_HID_FILTER, ...RY_HID_FILTERS];
+export const DRIVER_HID_FILTERS: object[] = [
+  OPENHE_HID_FILTER,
+  ...RY_HID_FILTERS,
+  ...SL_HID_FILTERS
+];
 
 export async function openDriver(
   device: HidDeviceLike,
@@ -32,6 +37,7 @@ export async function openDriver(
   if (isOpenHEDevice(device)) return OpenHEDriver.fromHidDevice(device);
   if (isRongyuanSettingsDevice(device))
     return connectRongyuan(device as FeatureHidDevice, siblings);
+  if (isSparklinkDevice(device)) return SparklinkDriver.fromHidDevice(device);
   throw new DriverError(
     `${device.productName || 'This device'} is not a keyboard OpenHE can configure.`
   );
@@ -39,7 +45,12 @@ export async function openDriver(
 
 /** Pick the settings collection among the interfaces the browser returned. */
 function pickSettings(devices: readonly HidDeviceLike[]): HidDeviceLike | null {
-  return devices.find(isOpenHEDevice) ?? devices.find(isRongyuanSettingsDevice) ?? null;
+  return (
+    devices.find(isOpenHEDevice) ??
+    devices.find(isRongyuanSettingsDevice) ??
+    devices.find(isSparklinkDevice) ??
+    null
+  );
 }
 
 /** Prompt for a keyboard and connect to it. */

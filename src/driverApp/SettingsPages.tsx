@@ -132,6 +132,28 @@ export function GeneralSettingsPage({
               </div>
             </Section>
           )}
+          {options?.pollingRateHz !== undefined && driver.capabilities.pollingRates.length > 0 && (
+            <Section
+              first
+              title="Report rate"
+              text="How often the keyboard reports to the computer. Higher is quicker; a few older games and USB hubs prefer 1000 Hz."
+            >
+              <div className="device-option-list polling-options">
+                {driver.capabilities.pollingRates.map(hz => (
+                  <button
+                    type="button"
+                    key={hz}
+                    className={`device-option-row ${options.pollingRateHz === hz ? 'is-selected' : ''}`}
+                    disabled={busy}
+                    onClick={() => setOpt({ pollingRateHz: hz }, 'Setting the report rate', false)}
+                  >
+                    <span className="device-radio-dot" aria-hidden="true" />
+                    <span>{hz >= 1000 ? `${hz / 1000} kHz` : `${hz} Hz`}</span>
+                  </button>
+                ))}
+              </div>
+            </Section>
+          )}
           {options?.xinput !== undefined && (
             <Section
               toggle

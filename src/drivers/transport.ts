@@ -6,8 +6,15 @@
  */
 
 export interface ReportTransport {
-  /** Send one output report and resolve with the next input report. */
-  exchange(report: Uint8Array, timeoutMs?: number): Promise<Uint8Array>;
+  /**
+   * Send one output report and resolve with the next input report (the next
+   * one `accept` takes, when given; others are dropped).
+   */
+  exchange(
+    report: Uint8Array,
+    timeoutMs?: number,
+    accept?: (reply: Uint8Array) => boolean
+  ): Promise<Uint8Array>;
   close(): Promise<void>;
 }
 
@@ -39,6 +46,7 @@ export interface HidDeviceLike {
 export class InputReportTransport implements ReportTransport {
   private queue: Promise<unknown> = Promise.resolve();
   private waiter: ((data: Uint8Array) => void) | null = null;
+  private accept: ((data: Uint8Array) => boolean) | null = null;
   private readonly onReport = (event: { reportId: number; data: DataView }) => {
     if (event.reportId !== this.reportId) return;
     const data = new Uint8Array(
@@ -46,6 +54,7 @@ export class InputReportTransport implements ReportTransport {
       event.data.byteOffset,
       event.data.byteLength
     ).slice();
+    if (this.accept && !this.accept(data)) return;
     const w = this.waiter;
     this.waiter = null;
     w?.(data);
@@ -58,15 +67,22 @@ export class InputReportTransport implements ReportTransport {
     device.addEventListener('inputreport', this.onReport);
   }
 
-  exchange(report: Uint8Array, timeoutMs = 1000): Promise<Uint8Array> {
+  exchange(
+    report: Uint8Array,
+    timeoutMs = 1000,
+    accept?: (reply: Uint8Array) => boolean
+  ): Promise<Uint8Array> {
     const run = () =>
       new Promise<Uint8Array>((resolve, reject) => {
         const timer = setTimeout(() => {
           this.waiter = null;
+          this.accept = null;
           reject(new Error('Keyboard did not answer'));
         }, timeoutMs);
+        this.accept = accept ?? null;
         this.waiter = data => {
           clearTimeout(timer);
+          this.accept = null;
           resolve(data);
         };
         this.device.sendReport(this.reportId, report as BufferSource).catch(err => {

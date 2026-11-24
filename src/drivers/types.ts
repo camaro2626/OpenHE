@@ -13,7 +13,7 @@
 
 import type { UiKeycode } from './keycodes';
 
-export type DriverId = 'openhe' | 'rongyuan' | 'aula-bytetech' | 'aula-xsyd';
+export type DriverId = 'openhe' | 'rongyuan' | 'sparklink' | 'aula-bytetech' | 'aula-xsyd';
 
 /** One physical key in the board's layout, in keycap units. */
 export type LayoutKey = {
@@ -255,6 +255,8 @@ export type DeviceOptions = {
   xinput?: boolean;
   /** 8 kHz polling on high-speed USB, 1 kHz otherwise. */
   highPollingRate?: boolean;
+  /** Report rate, one of `capabilities.pollingRates`. */
+  pollingRateHz?: number;
   /** Key debounce, 1..10 (RongYuan). */
   debounce?: number;
   /** Windows key disabled. */
