@@ -37,6 +37,8 @@ export const Cmd = {
   SET_SWITCH_PROFILES: 18,
   GET_KEY_SWITCHES: 19,
   SET_KEY_SWITCHES: 20,
+  /** Calibration session: 0 state, 1 start, 2 finish (Feature.GUIDED_CALIBRATION). */
+  CALIBRATION: 21,
   GET_KEYMAP: 128,
   SET_KEYMAP: 129,
   GET_ACTUATION_MAP: 130,
@@ -73,8 +75,11 @@ export const Feature = {
   CONTINUOUS_RT: 2,
   GAMEPAD: 4,
   WIRELESS: 8,
-  SWITCH_PROFILES: 16
+  SWITCH_PROFILES: 16,
+  GUIDED_CALIBRATION: 32
 } as const;
+
+export const CalibrationOp = { STATE: 0, START: 1, FINISH: 2 } as const;
 
 /** switch_profile_t: catalog id, travel (0.01 mm), curve. */
 export type HmkSwitchProfile = { catalogId: number; travelCmm: number; curve: number };

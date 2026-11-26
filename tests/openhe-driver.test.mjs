@@ -62,6 +62,7 @@ function fakeOpenHE(md = metadata, opts = {}) {
     return true
   }
   const log = []
+  const session = { active: false, done: new Set() }
   const cal = { rest: 4095, bottom: 500 }
   let switchProfiles = Array.from({ length: 4 }, () => [0, 400 & 0xff, 400 >> 8, 15])
   const keySwitch = new Uint8Array(N)
@@ -85,7 +86,7 @@ function fakeOpenHE(md = metadata, opts = {}) {
         break
       }
       case 14: out.set(Buffer.from('GK68-TEST'), 1); break
-      case 16: if (opts.notOpenHE) return fail(); out.set([0x4f, 0x50, 0x48, 0x45, 1, 0, 0x08, 0x01, 400 & 0xff, 400 >> 8, 7 | 16, 0, 0, 0], 1); break
+      case 16: if (opts.notOpenHE) return fail(); out.set([0x4f, 0x50, 0x48, 0x45, 1, 0, 0x08, 0x01, 400 & 0xff, 400 >> 8, 7 | 16 | (opts.guided ? 32 : 0), 0, 0, 0], 1); break
       case 5: {
         const off = req[1]; if (off >= N) return fail()
         for (let i = 0; i < 15 && off + i < N; i++) {
@@ -134,6 +135,13 @@ function fakeOpenHE(md = metadata, opts = {}) {
       case 11: if (req[1] >= P) return fail(); log.push(`reset ${req[1]}`); break
       case 12: if (req[1] >= P || req[2] >= P) return fail(); log.push(`dup ${req[2]}->${req[1]}`); break
       case 15: log.push('save-cal'); break
+      case 21: {
+        if (req[1] === 1) { session.active = true; session.done.clear(); log.push('cal-start') }
+        else if (req[1] === 2) { session.active = false; log.push('cal-finish') }
+        out[1] = session.active ? 1 : 0
+        for (const k of session.done) out[2 + (k >> 3)] |= 1 << (k & 7)
+        break
+      }
       case 17: out[1] = 4; switchProfiles.forEach((p, i) => out.set(p, 2 + i * 4)); break
       case 18: {
         if (req[1] !== 4) return fail()
@@ -178,7 +186,7 @@ function fakeOpenHE(md = metadata, opts = {}) {
     },
     async close() {}
   }
-  return { transport, profiles, log, akSize, cal, keySwitch, get switchProfiles() { return switchProfiles }, get options() { return options } }
+  return { transport, profiles, log, akSize, cal, keySwitch, session, get switchProfiles() { return switchProfiles }, get options() { return options } }
 }
 
 const usb = { vendorId: 0x3151, productId: 0x5030, productName: 'GK68' }
@@ -444,4 +452,20 @@ test('switch profiles: mixed switches pack into firmware profiles, most used fir
   await d.setSwitchSetup({ keySwitch, tuning: { 'gravastar-ufo': { travelMm: 20, curve: 999 }, 'skyloong-crystal-blue': { travelMm: 4, curve: 20 } } })
   assert.deepEqual(board.switchProfiles[0], [1, 1000 & 0xff, 1000 >> 8, 250])
   await assert.rejects(d.setSwitchSetup({ keySwitch: keySwitch.map(() => 'nope'), tuning: {} }), /Unknown switch/)
+})
+
+test('guided calibration: only on firmware with the feature, key bits by firmware index', async () => {
+  const plain = await OpenHEDriver.connect(fakeOpenHE().transport, usb)
+  assert.equal(plain.startCalibration, undefined)
+  const { transport, log, session } = fakeOpenHE(metadata, { guided: true })
+  const d = await OpenHEDriver.connect(transport, usb)
+  await d.startCalibration()
+  assert.deepEqual(log.slice(-1), ['cal-start'])
+  session.done.add(0); session.done.add(9); session.done.add(67)
+  const p = await d.calibrationProgress()
+  assert.equal(p.length, d.layout.keys.length)
+  const lit = d.layout.keys.flatMap((k, i) => (p[i] ? [k.index] : []))
+  assert.deepEqual(lit, [0, 9, 67])
+  await d.finishCalibration()
+  assert.deepEqual(log.slice(-1), ['cal-finish'])
 })

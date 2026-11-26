@@ -462,13 +462,13 @@ export function CalibrationSettingsPage({
             <Section
               first
               title="Calibrate"
-              text="The keyboard learns each switch's rest and bottom-out positions while you press every key. Do it after changing switches, or when keys trigger too early or too late."
-              hint="Close the vendor's own software first. If you leave this page mid-way, calibration is finished and saved with what the keyboard has learned."
+              text={`The keyboard learns each switch's rest and bottom-out positions while you press every key. Do it after changing switches, or when keys trigger too early or too late.${driver.id === 'openhe' ? ' The keyboard lights every key blue and turns each one green as it is learned.' : ''}`}
+              hint="Take your hands off the keyboard before starting: the rest positions are taken right then. If you leave this page mid-way, calibration is finished and saved with what the keyboard has learned."
             >
               <GuidedCalibration driver={driver} model={model} busy={busy} />
             </Section>
           )}
-          {driver.recalibrate && (
+          {driver.recalibrate && !driver.startCalibration && (
             <Section
               first
               title="Recalibrate"
@@ -484,7 +484,7 @@ export function CalibrationSettingsPage({
               </button>
             </Section>
           )}
-          {driver.saveCalibration && (
+          {driver.saveCalibration && !driver.startCalibration && (
             <Section
               title="Keep learned bottom-out positions"
               text="Saves the bottom-out positions learned since the last recalibration, so keys are accurate right after a restart."

@@ -53,6 +53,7 @@ import {
   formatFirmwareVersion,
   decodeFirmwareInfo,
   ActFlag,
+  CalibrationOp,
   Feature,
   OPENHE_PROTOCOL_VERSION,
   KEY_SWITCH_GET_CHUNK,
@@ -101,6 +102,12 @@ export class OpenHEDriver implements KeyboardDriver {
     readonly firmware: FirmwareInfo
   ) {
     this.travelMm = firmware.travelCmm / 100;
+    if (firmware.features & Feature.GUIDED_CALIBRATION) {
+      this.startCalibration = () => this.calibrationCall(CalibrationOp.START).then(() => undefined);
+      this.calibrationProgress = () => this.calibrationCall(CalibrationOp.STATE).then(s => s.done);
+      this.finishCalibration = () =>
+        this.calibrationCall(CalibrationOp.FINISH).then(() => undefined);
+    }
     this.capabilities = {
       profiles: metadata.numProfiles,
       layers: metadata.numLayers,
@@ -443,6 +450,24 @@ export class OpenHEDriver implements KeyboardDriver {
 
   async recalibrate(): Promise<void> {
     await this.call(Cmd.RECALIBRATE);
+  }
+
+  /**
+   * Guided calibration (firmware feature bit 5): start forgets the learned
+   * bottom-outs and takes the rest values with the LEDs off, then the board
+   * lights every key blue and each one green once a full press has been
+   * learned; finish saves. Present only on firmware that has it.
+   */
+  startCalibration?: () => Promise<void>;
+  calibrationProgress?: () => Promise<boolean[]>;
+  finishCalibration?: () => Promise<void>;
+
+  private async calibrationCall(op: number): Promise<{ active: boolean; done: boolean[] }> {
+    const r = await this.call(Cmd.CALIBRATION, [op]);
+    return {
+      active: r[1] === 1,
+      done: this.layout.keys.map(k => ((r[2 + (k.index >> 3)] >> (k.index & 7)) & 1) === 1)
+    };
   }
 
   async getGamepad(profile: number): Promise<GamepadConfig> {
