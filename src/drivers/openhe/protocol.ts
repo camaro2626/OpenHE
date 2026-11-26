@@ -39,6 +39,11 @@ export const Cmd = {
   SET_KEY_SWITCHES: 20,
   /** Calibration session: 0 state, 1 start, 2 finish (Feature.GUIDED_CALIBRATION). */
   CALIBRATION: 21,
+  /** Stored crosstalk table, pages of XTALK_CHUNK pairs (Feature.XTALK). */
+  GET_XTALK: 22,
+  SET_XTALK: 23,
+  /** Key LED guide: on, red key (0xFF none), green bits (Feature.KEY_LEDS). */
+  KEY_LEDS: 24,
   GET_KEYMAP: 128,
   SET_KEYMAP: 129,
   GET_ACTUATION_MAP: 130,
@@ -76,8 +81,17 @@ export const Feature = {
   GAMEPAD: 4,
   WIRELESS: 8,
   SWITCH_PROFILES: 16,
-  GUIDED_CALIBRATION: 32
+  GUIDED_CALIBRATION: 32,
+  XTALK: 64,
+  KEY_LEDS: 128
 } as const;
+
+export const XTALK_CHUNK = 20;
+export const XTALK_SLOTS = 96;
+/** Coefficients are stored as k * 4096 in one byte. */
+export const XTALK_Q = 4096;
+export const XTALK_MAX_Q = 255;
+export const KEY_LEDS_NONE = 0xff;
 
 export const CalibrationOp = { STATE: 0, START: 1, FINISH: 2 } as const;
 

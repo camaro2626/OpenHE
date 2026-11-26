@@ -366,6 +366,8 @@ export type SwitchCatalogEntry = {
   detail?: string;
 };
 
+export type CrosstalkPair = { victim: number; aggressor: number; k: number };
+
 export type SwitchTuning = { travelMm: number; curve: number };
 
 export type SwitchSetup = {
@@ -462,6 +464,22 @@ export interface KeyboardDriver {
   startCalibration?(): Promise<void>;
   calibrationProgress?(): Promise<boolean[]>;
   finishCalibration?(): Promise<void>;
+  /**
+   * Magnetic crosstalk compensation (OpenHE firmware): each pair takes
+   * `k` x the aggressor's press off the victim's reading. Layout key indexes.
+   */
+  getCrosstalk?(): Promise<CrosstalkPair[]>;
+  setCrosstalk?(pairs: readonly CrosstalkPair[]): Promise<void>;
+  /** Largest coupling the board can store (fraction of a press). */
+  readonly crosstalkMax?: number;
+  /** Most pairs the board can store. */
+  readonly crosstalkSlots?: number;
+  /**
+   * Light keys on the keyboard as a guide: `red` (a layout key) red, the
+   * `done` keys green, the rest off; null turns it off. The board turns it
+   * off by itself if it is not sent again within a few seconds.
+   */
+  setKeyGuide?(guide: { red: number | null; done: readonly boolean[] } | null): Promise<void>;
   /** Changing a key's switch clears its calibration (Sparklink). */
   readonly switchChangeNeedsCalibration?: boolean;
   factoryReset?(): Promise<void>;

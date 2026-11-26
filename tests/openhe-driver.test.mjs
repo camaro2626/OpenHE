@@ -63,6 +63,9 @@ function fakeOpenHE(md = metadata, opts = {}) {
   }
   const log = []
   const session = { active: false, done: new Set() }
+  let xtalk = Array.from({ length: 25 }, (_, i) => [i, i + 1, 30 + i])
+  let xtalkStaged = []
+  const leds = []
   const cal = { rest: 4095, bottom: 500 }
   let switchProfiles = Array.from({ length: 4 }, () => [0, 400 & 0xff, 400 >> 8, 15])
   const keySwitch = new Uint8Array(N)
@@ -86,7 +89,7 @@ function fakeOpenHE(md = metadata, opts = {}) {
         break
       }
       case 14: out.set(Buffer.from('GK68-TEST'), 1); break
-      case 16: if (opts.notOpenHE) return fail(); out.set([0x4f, 0x50, 0x48, 0x45, 1, 0, 0x08, 0x01, 400 & 0xff, 400 >> 8, 7 | 16 | (opts.guided ? 32 : 0), 0, 0, 0], 1); break
+      case 16: if (opts.notOpenHE) return fail(); out.set([0x4f, 0x50, 0x48, 0x45, 1, 0, 0x08, 0x01, 400 & 0xff, 400 >> 8, 7 | 16 | (opts.guided ? 32 : 0) | (opts.xtalk ? 64 | 128 : 0), 0, 0, 0], 1); break
       case 5: {
         const off = req[1]; if (off >= N) return fail()
         for (let i = 0; i < 15 && off + i < N; i++) {
@@ -135,6 +138,22 @@ function fakeOpenHE(md = metadata, opts = {}) {
       case 11: if (req[1] >= P) return fail(); log.push(`reset ${req[1]}`); break
       case 12: if (req[1] >= P || req[2] >= P) return fail(); log.push(`dup ${req[2]}->${req[1]}`); break
       case 15: log.push('save-cal'); break
+      case 22: {
+        const off = req[1]
+        if (off > xtalk.length) return fail()
+        const page = xtalk.slice(off, off + 20)
+        out[1] = xtalk.length; out[2] = page.length
+        page.forEach((p, i) => out.set(p, 3 + i * 3))
+        break
+      }
+      case 23: {
+        const [, total, off, len] = req
+        if (off === 0) xtalkStaged = []
+        for (let i = 0; i < len; i++) xtalkStaged.push([...req.subarray(4 + i * 3, 7 + i * 3)])
+        if (off + len === total) { xtalk = xtalkStaged; log.push(`xtalk-save ${total}`) }
+        break
+      }
+      case 24: leds.push(req[1] ? { red: req[2], bits: [...req.subarray(3, 12)] } : null); break
       case 21: {
         if (req[1] === 1) { session.active = true; session.done.clear(); log.push('cal-start') }
         else if (req[1] === 2) { session.active = false; log.push('cal-finish') }
@@ -186,7 +205,7 @@ function fakeOpenHE(md = metadata, opts = {}) {
     },
     async close() {}
   }
-  return { transport, profiles, log, akSize, cal, keySwitch, session, get switchProfiles() { return switchProfiles }, get options() { return options } }
+  return { transport, profiles, log, akSize, cal, keySwitch, session, leds, get xtalk() { return xtalk }, get switchProfiles() { return switchProfiles }, get options() { return options } }
 }
 
 const usb = { vendorId: 0x3151, productId: 0x5030, productName: 'GK68' }
@@ -468,4 +487,36 @@ test('guided calibration: only on firmware with the feature, key bits by firmwar
   assert.deepEqual(lit, [0, 9, 67])
   await d.finishCalibration()
   assert.deepEqual(log.slice(-1), ['cal-finish'])
+})
+
+test('crosstalk table and key LED guide: only on firmware that has them, in pages, layout indexes', async () => {
+  const plain = await OpenHEDriver.connect(fakeOpenHE().transport, usb)
+  assert.equal(plain.getCrosstalk, undefined)
+  assert.equal(plain.setKeyGuide, undefined)
+  const f = fakeOpenHE(metadata, { xtalk: true })
+  const d = await OpenHEDriver.connect(f.transport, usb)
+  const at = fw => d.layout.keys.findIndex(k => k.index === fw)
+  // 25 pairs come back over two pages, as fractions, in layout indexes
+  const table = await d.getCrosstalk()
+  assert.equal(table.length, 25)
+  assert.deepEqual(table[24], { victim: at(24), aggressor: at(25), k: 54 / 4096 })
+  // written back in pages of 20, saved once
+  const next = [...table.slice(0, 21), { victim: at(3), aggressor: at(2), k: 0.012 }]
+  await d.setCrosstalk(next)
+  assert.deepEqual(f.log.filter(l => l.startsWith('xtalk-save')), ['xtalk-save 22'])
+  assert.deepEqual(f.xtalk.at(-1), [3, 2, Math.round(0.012 * 4096)])
+  // too strong for a byte: capped at 255 / 4096
+  await d.setCrosstalk([{ victim: at(0), aggressor: at(1), k: 0.5 }])
+  assert.deepEqual(f.xtalk, [[0, 1, 255]])
+  // empty turns it off
+  await d.setCrosstalk([])
+  assert.deepEqual(f.xtalk, [])
+  // the guide: red key and green bits by firmware index
+  const done = d.layout.keys.map(k => k.index === 9 || k.index === 64)
+  await d.setKeyGuide({ red: at(10), done })
+  assert.equal(f.leds.at(-1).red, 10)
+  assert.equal(f.leds.at(-1).bits[1], 1 << 1) // key 9
+  assert.equal(f.leds.at(-1).bits[8], 1 << 0) // key 64
+  await d.setKeyGuide(null)
+  assert.equal(f.leds.at(-1), null)
 })

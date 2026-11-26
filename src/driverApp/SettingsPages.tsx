@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Toggle } from '../app/components/Toggle';
 import type { HeroDeviceModelId } from '../keyboard/devices';
 import { GuidedCalibration } from './GuidedCalibration';
+import { CrosstalkTool } from './CrosstalkTool';
 import type {
   CalibrationSettings,
   DeviceOptions,
@@ -466,6 +467,15 @@ export function CalibrationSettingsPage({
               hint="Take your hands off the keyboard before starting: the rest positions are taken right then. If you leave this page mid-way, calibration is finished and saved with what the keyboard has learned."
             >
               <GuidedCalibration driver={driver} model={model} busy={busy} />
+            </Section>
+          )}
+          {driver.getCrosstalk && driver.setCrosstalk && driver.readTravel && (
+            <Section
+              title="Crosstalk"
+              text={`Each key's magnet reaches its neighbours' sensors a little, so pressing one key moves the next one's reading slightly. The keyboard takes that off, from a table measured on this board. Measure it again after changing switches.${driver.setKeyGuide ? ' The keyboard lights the key to press red and turns it green when done.' : ''}`}
+              hint="Press each key alone with one finger and hold it until it turns green; a press that brushes a neighbour is refused and asked for again."
+            >
+              <CrosstalkTool driver={driver} model={model} busy={busy} />
             </Section>
           )}
           {driver.recalibrate && !driver.startCalibration && (

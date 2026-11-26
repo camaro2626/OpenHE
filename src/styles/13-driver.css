@@ -1027,3 +1027,7 @@
 .drv-switch-cal-note {
   margin-top: 12px;
 }
+.drv-guided-cal .hero-key.drv-xt-target {
+  background: rgba(232, 72, 72, 0.32);
+  border-color: rgba(232, 72, 72, 0.9);
+}

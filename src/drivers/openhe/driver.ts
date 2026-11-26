@@ -17,6 +17,7 @@ import {
   type AdvancedKey,
   type BoardLayout,
   type CalibrationSettings,
+  type CrosstalkPair,
   type DeviceOptions,
   type SwitchCatalogEntry,
   type SwitchSetup,
@@ -54,6 +55,11 @@ import {
   decodeFirmwareInfo,
   ActFlag,
   CalibrationOp,
+  KEY_LEDS_NONE,
+  XTALK_CHUNK,
+  XTALK_MAX_Q,
+  XTALK_Q,
+  XTALK_SLOTS,
   Feature,
   OPENHE_PROTOCOL_VERSION,
   KEY_SWITCH_GET_CHUNK,
@@ -102,6 +108,11 @@ export class OpenHEDriver implements KeyboardDriver {
     readonly firmware: FirmwareInfo
   ) {
     this.travelMm = firmware.travelCmm / 100;
+    if (firmware.features & Feature.XTALK) {
+      this.getCrosstalk = () => this.readCrosstalk();
+      this.setCrosstalk = pairs => this.writeCrosstalk(pairs);
+    }
+    if (firmware.features & Feature.KEY_LEDS) this.setKeyGuide = guide => this.writeKeyGuide(guide);
     if (firmware.features & Feature.GUIDED_CALIBRATION) {
       this.startCalibration = () => this.calibrationCall(CalibrationOp.START).then(() => undefined);
       this.calibrationProgress = () => this.calibrationCall(CalibrationOp.STATE).then(s => s.done);
@@ -461,6 +472,71 @@ export class OpenHEDriver implements KeyboardDriver {
   startCalibration?: () => Promise<void>;
   calibrationProgress?: () => Promise<boolean[]>;
   finishCalibration?: () => Promise<void>;
+
+  getCrosstalk?: () => Promise<CrosstalkPair[]>;
+  setCrosstalk?: (pairs: readonly CrosstalkPair[]) => Promise<void>;
+  readonly crosstalkMax = XTALK_MAX_Q / XTALK_Q;
+  readonly crosstalkSlots = XTALK_SLOTS;
+  setKeyGuide?: (guide: { red: number | null; done: readonly boolean[] } | null) => Promise<void>;
+
+  /** Firmware key index of each layout key, and back. */
+  private get keyIndexes() {
+    const toFw = this.layout.keys.map(k => k.index);
+    const toLayout = new Map(toFw.map((fw, i) => [fw, i]));
+    return { toFw, toLayout };
+  }
+
+  private async readCrosstalk(): Promise<CrosstalkPair[]> {
+    const { toLayout } = this.keyIndexes;
+    const out: CrosstalkPair[] = [];
+    for (let offset = 0; ;) {
+      const r = await this.call(Cmd.GET_XTALK, [offset]);
+      const total = r[1];
+      const len = r[2];
+      for (let i = 0; i < len; i++) {
+        const [v, a, q] = [r[3 + i * 3], r[4 + i * 3], r[5 + i * 3]];
+        const victim = toLayout.get(v);
+        const aggressor = toLayout.get(a);
+        if (victim !== undefined && aggressor !== undefined)
+          out.push({ victim, aggressor, k: q / XTALK_Q });
+      }
+      offset += len;
+      if (offset >= total || len === 0) return out;
+    }
+  }
+
+  private async writeCrosstalk(pairs: readonly CrosstalkPair[]): Promise<void> {
+    const { toFw } = this.keyIndexes;
+    const wire = pairs
+      .map(p => [toFw[p.victim], toFw[p.aggressor], Math.round(p.k * XTALK_Q)] as const)
+      .filter(([v, a, q]) => v !== undefined && a !== undefined && v !== a && q > 0)
+      .map(([v, a, q]) => [v, a, Math.min(XTALK_MAX_Q, q)]);
+    if (wire.length > XTALK_SLOTS)
+      throw new DriverError(`The keyboard stores at most ${XTALK_SLOTS} crosstalk pairs.`);
+    if (!wire.length) {
+      await this.call(Cmd.SET_XTALK, [0, 0, 0]);
+      return;
+    }
+    for (let offset = 0; offset < wire.length; offset += XTALK_CHUNK) {
+      const page = wire.slice(offset, offset + XTALK_CHUNK);
+      await this.call(Cmd.SET_XTALK, [wire.length, offset, page.length, ...page.flat()]);
+    }
+  }
+
+  private async writeKeyGuide(guide: { red: number | null; done: readonly boolean[] } | null) {
+    if (!guide) {
+      await this.call(Cmd.KEY_LEDS, [0]);
+      return;
+    }
+    const { toFw } = this.keyIndexes;
+    const bits = new Array(Math.ceil(this.metadata.numKeys / 8)).fill(0);
+    guide.done.forEach((on, i) => {
+      const fw = toFw[i];
+      if (on && fw !== undefined) bits[fw >> 3] |= 1 << (fw & 7);
+    });
+    const red = guide.red === null ? KEY_LEDS_NONE : (toFw[guide.red] ?? KEY_LEDS_NONE);
+    await this.call(Cmd.KEY_LEDS, [1, red, ...bits]);
+  }
 
   private async calibrationCall(op: number): Promise<{ active: boolean; done: boolean[] }> {
     const r = await this.call(Cmd.CALIBRATION, [op]);
