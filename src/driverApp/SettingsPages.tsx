@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Toggle } from '../app/components/Toggle';
+import type { HeroDeviceModelId } from '../keyboard/devices';
+import { GuidedCalibration } from './GuidedCalibration';
 import type {
   CalibrationSettings,
   DeviceOptions,
@@ -413,10 +415,12 @@ export function ProfilesSettingsPage({
 /** Calibration starting values, learned values, recalibrate. */
 export function CalibrationSettingsPage({
   driver,
+  model,
   busy,
   run
 }: {
   driver: KeyboardDriver;
+  model: HeroDeviceModelId;
   busy: boolean;
   run: Run;
 }) {
@@ -454,6 +458,16 @@ export function CalibrationSettingsPage({
       />
       <div className="general-settings-stack">
         <div className="wooting-settings-card">
+          {driver.startCalibration && driver.calibrationProgress && driver.finishCalibration && (
+            <Section
+              first
+              title="Calibrate"
+              text="The keyboard learns each switch's rest and bottom-out positions while you press every key. Do it after changing switches, or when keys trigger too early or too late."
+              hint="Close the vendor's own software first. If you leave this page mid-way, calibration is finished and saved with what the keyboard has learned."
+            >
+              <GuidedCalibration driver={driver} model={model} busy={busy} />
+            </Section>
+          )}
           {driver.recalibrate && (
             <Section
               first
@@ -526,7 +540,7 @@ export function CalibrationSettingsPage({
               </span>
             </Section>
           )}
-          {!driver.recalibrate && !driver.setCalibration && (
+          {!driver.recalibrate && !driver.setCalibration && !driver.startCalibration && (
             <Section
               first
               title="Not available"

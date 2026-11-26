@@ -118,6 +118,12 @@ export function SwitchesPage({
         saveState={justSaved && !sw.dirty ? 'sent' : 'idle'}
         onSave={() => void save()}
       >
+        {justSaved && !sw.dirty && driver.switchChangeNeedsCalibration && (
+          <div className="drv-notice drv-switch-cal-note">
+            The keyboard forgets the calibration of keys whose switch changed. Calibrate them under
+            Settings → Calibration before relying on their travel.
+          </div>
+        )}
         {current?.tunable && tuning && inUse.has(current.id) && (
           <section className="switch-assignment-grid">
             <article className="settings-card switch-assignment-card drv-switch-tuning">

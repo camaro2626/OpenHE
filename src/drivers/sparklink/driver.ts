@@ -27,6 +27,8 @@ import {
   type LightingState,
   type LightSetting,
   type LightZone,
+  type SwitchCatalogEntry,
+  type SwitchSetup,
   type MacroStep,
   type KeyboardDriver,
   type LayoutKey,
@@ -36,6 +38,7 @@ import type { UiKeycode } from '../keycodes';
 import { decodeUiKeycode, uiNative } from '../keycodes';
 import { isSparklinkId, SPARKLINK_IDS } from './ids';
 import { slExtraKeycodes, slName, slToUi, uiToSl } from './keycodes';
+import SL_SWITCHES from './switches.json';
 import {
   Area,
   configList,
@@ -47,6 +50,11 @@ import {
   getKeyRow,
   getPerformance,
   getRoute,
+  getCalibrationRow,
+  CALIBRATED,
+  calibration,
+  axisList,
+  PerfCmd,
   getStyleRow,
   Group,
   KEY_WIDTH,
@@ -170,7 +178,9 @@ export class SparklinkDriver implements KeyboardDriver {
       double: boolean;
       /** The keys' LED grid; a key's cell is row * cols + col. */
       grid: { rows: number; cols: number };
-    } | null = null
+    } | null = null,
+    /** Keys take a switch from Sparklink's catalog (axisV2Id); see `switchCatalog`. */
+    private readonly unlimitedSwitches = false
   ) {
     this.rateCodes = rateCodes;
     this.capabilities = {
@@ -195,7 +205,7 @@ export class SparklinkDriver implements KeyboardDriver {
       dynamicKeystrokeBindings: 4,
       macros: true,
       travelStream: true,
-      calibration: false,
+      calibration: true,
       rgb: light !== null,
       gamepad: false,
       pollingRates: rateCodes.map(c => REPORT_RATES_HZ[c]).filter(Boolean),
@@ -268,6 +278,8 @@ export class SparklinkDriver implements KeyboardDriver {
         ? mm(p.axisRangeMax)
         : DEFAULT_TRAVEL_MM;
     }, DEFAULT_TRAVEL_MM);
+    // an empty switch list means each key stores its own switch from the catalog
+    const unlimitedSwitches = await optional(async () => (await ask(axisList()))[3] === 0, false);
     const light = features.rgb
       ? await optional(async () => {
           const list = parseLightAreas(await ask(lightAreas()));
@@ -299,7 +311,8 @@ export class SparklinkDriver implements KeyboardDriver {
       rateCodes.filter(c => c < REPORT_RATES_HZ.length),
       travelMm,
       stepMm,
-      light
+      light,
+      unlimitedSwitches
     );
   }
 
@@ -624,6 +637,93 @@ export class SparklinkDriver implements KeyboardDriver {
     this.hkCache = { profile, values: next };
   }
 
+  // ------------------------------------------------------------ switches
+
+  /** Changing a key's switch clears its calibration (the firmware does it). */
+  readonly switchChangeNeedsCalibration = true;
+
+  switchCatalog(): SwitchCatalogEntry[] {
+    if (!this.unlimitedSwitches) return [];
+    return [
+      ...SL_SWITCHES.map(sw => ({
+        id: `axis-${sw.id}`,
+        name: sw.name,
+        brand: sw.brand,
+        travelMm: sw.travelUm / 1000,
+        tunable: false,
+        color: sw.color,
+        detail: `${(sw.travelUm / 1000).toFixed(2)} mm · ${sw.nameZh}`
+      })),
+      {
+        id: 'unset',
+        name: 'Unknown switch',
+        brand: 'Other',
+        travelMm: this.capabilities.travelMm,
+        tunable: false
+      }
+    ];
+  }
+
+  async getSwitchSetup(): Promise<SwitchSetup> {
+    if (!this.unlimitedSwitches) throw new DriverError('This board keeps its own switch list.');
+    this.perfCache = null;
+    const perf = await this.readPerformance(await this.getProfile());
+    return {
+      keySwitch: perf.map(p => (SWITCH_BY_ID.has(p.axisV2Id) ? `axis-${p.axisV2Id}` : 'unset')),
+      tuning: {}
+    };
+  }
+
+  /**
+   * A switch is three fields of each key's performance record: its catalog
+   * id, full travel and magnetic coefficient. Keys set to "unknown" keep
+   * what they have. The board clears a changed key's calibration.
+   */
+  async setSwitchSetup(setup: SwitchSetup): Promise<void> {
+    if (!this.unlimitedSwitches) throw new DriverError('This board keeps its own switch list.');
+    if (setup.keySwitch.length !== this.positions.length)
+      throw new RangeError('switch assignment length does not match the board');
+    const profile = await this.getProfile();
+    this.perfCache = null;
+    const current = await this.readPerformance(profile);
+    const next = current.map((p, i) => {
+      const id = setup.keySwitch[i];
+      if (id === 'unset') return p;
+      const sw = SWITCH_BY_ID.get(Number(id.replace(/^axis-/, '')));
+      if (!sw) throw new DriverError(`Switch "${id}" is not in the catalog.`);
+      return { ...p, axisV2Id: sw.id, axisRangeMax: sw.travelUm, axisCoefficient: sw.coefficient };
+    });
+    let wrote = false;
+    for (let i = 0; i < next.length; i++) {
+      if (samePerformance(current[i], next[i])) continue;
+      const { row, col } = this.positions[i];
+      await this.ask(setPerformance(row, col, next[i]));
+      wrote = true;
+    }
+    if (wrote) await this.ask(save(Area.PERFORMANCE));
+    this.perfCache = { profile, values: next };
+  }
+
+  // ------------------------------------------------------------ calibration
+
+  async startCalibration(): Promise<void> {
+    await this.ask(calibration(true));
+  }
+
+  /** Per layout key: calibrated. */
+  async calibrationProgress(): Promise<boolean[]> {
+    const byRow = new Map<number, number[]>();
+    for (const row of this.rows)
+      byRow.set(row, parseAxisRow(await this.ask(getCalibrationRow(row))));
+    return this.positions.map(({ row, col }) => byRow.get(row)?.[col] === CALIBRATED);
+  }
+
+  async finishCalibration(): Promise<void> {
+    await this.ask(calibration(false));
+    await this.ask(save(Area.CALIBRATION));
+    this.perfCache = null;
+  }
+
   // ------------------------------------------------------------ lighting
 
   lightingInfo(): LightingInfo {
@@ -632,19 +732,29 @@ export class SparklinkDriver implements KeyboardDriver {
       backlight: zone,
       ...(this.light?.areas.includes(1) ? { side: zone } : {}),
       canSwitchOff: true,
-      ...(this.cellOf().some(c => c >= 0)
+      ...(this.cellsOf().some(c => c.length)
         ? { perKey: { mode: LIGHT_PER_KEY_MODE, readable: true, overlay: true } }
         : {})
     };
   }
 
-  /** Each layout key's LED cell, or -1 outside the grid. */
-  private cellOf(): number[] {
+  /**
+   * Each layout key's LED cells: its own (row * cols + col), then, for a key
+   * wider than 1u, the cells to its right that no key owns, up to its width
+   * (a spacebar's row of LEDs, the second LED under a wide Shift).
+   */
+  private cellsOf(): number[][] {
     const g = this.light?.grid;
-    if (!g || !g.rows || !g.cols) return this.positions.map(() => -1);
-    return this.positions.map(({ row, col }) =>
-      row < g.rows && col < g.cols ? row * g.cols + col : -1
-    );
+    if (!g || !g.rows || !g.cols) return this.positions.map(() => []);
+    const taken = new Set(this.positions.map(p => `${p.row}:${p.col}`));
+    return this.positions.map(({ row, col }, i) => {
+      if (row >= g.rows || col >= g.cols) return [];
+      const cells = [row * g.cols + col];
+      const span = Math.ceil(this.layout.keys[i].w - 0.01);
+      for (let c = col + 1; c < Math.min(g.cols, col + span) && !taken.has(`${row}:${c}`); c++)
+        cells.push(row * g.cols + c);
+      return cells;
+    });
   }
 
   private async readCells(): Promise<number[][]> {
@@ -659,8 +769,8 @@ export class SparklinkDriver implements KeyboardDriver {
   async getPerKeyColors(): Promise<Array<number | null>> {
     if (!this.light) throw new DriverError(`${this.info.name} has no lighting OpenHE can set.`);
     const cells = await this.readCells();
-    return this.cellOf().map(i => {
-      const cell = cells[i];
+    return this.cellsOf().map(own => {
+      const cell = cells[own[0]];
       if (!cell || cell[3] !== LIGHT_PAINTED) return null;
       return (cell[2] << 16) | (cell[1] << 8) | cell[0];
     });
@@ -674,10 +784,11 @@ export class SparklinkDriver implements KeyboardDriver {
     if (!this.light) throw new DriverError(`${this.info.name} has no lighting OpenHE can set.`);
     const before = await this.readCells();
     const next = before.map(c => [c[0], c[1], c[2], 0]);
-    this.cellOf().forEach((i, key) => {
+    this.cellsOf().forEach((own, key) => {
       const c = colors[key];
-      if (i < 0 || i >= next.length || c == null) return;
-      next[i] = [c & 0xff, (c >> 8) & 0xff, (c >> 16) & 0xff, LIGHT_PAINTED];
+      if (c == null) return;
+      for (const i of own)
+        if (i < next.length) next[i] = [c & 0xff, (c >> 8) & 0xff, (c >> 16) & 0xff, LIGHT_PAINTED];
     });
     let wrote = false;
     for (let c = 0; c * LIGHT_CELLS_PER_CHUNK < next.length; c++) {
@@ -1101,6 +1212,8 @@ export function actionsToTrps(actions: readonly DksAction[]): number {
   return trps;
 }
 
+const SWITCH_BY_ID = new Map(SL_SWITCHES.map(sw => [sw.id, sw]));
+
 const sameHk = (a: SlHigherKey, b: SlHigherKey) => JSON.stringify(a) === JSON.stringify(b);
 
 /** A macro's identity, independent of how its objects were built. */
@@ -1134,7 +1247,14 @@ async function call(
   pkt: Uint8Array,
   timeoutMs = 1000
 ): Promise<Uint8Array> {
-  const reply = await transport.exchange(pkt, timeoutMs, r => r[0] === pkt[0] && r[1] === pkt[1]);
+  // after one axis-data query the board keeps sending every row and kind by
+  // itself until another command comes; take only the row and kind asked for
+  const axis = pkt[0] === Group.PERFORMANCE && pkt[1] === PerfCmd.AXIS_DATA;
+  const reply = await transport.exchange(
+    pkt,
+    timeoutMs,
+    r => r[0] === pkt[0] && r[1] === pkt[1] && (!axis || (r[2] === pkt[2] && r[3] === pkt[3]))
+  );
   return reply;
 }
 

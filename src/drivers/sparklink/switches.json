@@ -1,0 +1,749 @@
+[
+  {
+    "id": 4112,
+    "name": "Magnetic Jade",
+    "nameZh": "磁玉轴",
+    "brand": "Gateron",
+    "travelUm": 3430,
+    "coefficient": 22800,
+    "color": "#dbfdcd"
+  },
+  {
+    "id": 4128,
+    "name": "Magnetic Jade Pro",
+    "nameZh": "磁玉Pro",
+    "brand": "Gateron",
+    "travelUm": 3390,
+    "coefficient": 20000,
+    "color": "#adfb8c"
+  },
+  {
+    "id": 4144,
+    "name": "Magnetic Jade Gaming",
+    "nameZh": "磁玉Gaming",
+    "brand": "Gateron",
+    "travelUm": 3400,
+    "coefficient": 19000,
+    "color": "#69ff51"
+  },
+  {
+    "id": 4160,
+    "name": "Magnetic Jade Air",
+    "nameZh": "磁玉Air",
+    "brand": "Gateron",
+    "travelUm": 3430,
+    "coefficient": 19600,
+    "color": "#f0f6bb"
+  },
+  {
+    "id": 4176,
+    "name": "Jade King (Yujingzi)",
+    "nameZh": "玉京子轴",
+    "brand": "Gateron",
+    "travelUm": 3420,
+    "coefficient": 20350,
+    "color": "#ff3f3f"
+  },
+  {
+    "id": 4192,
+    "name": "Green Dragon",
+    "nameZh": "绿龙轴",
+    "brand": "Gateron",
+    "travelUm": 3350,
+    "coefficient": 21300,
+    "color": "#a8ff47"
+  },
+  {
+    "id": 4208,
+    "name": "Apollo Ultra-Short",
+    "nameZh": "阿波罗轴",
+    "brand": "Gateron",
+    "travelUm": 3130,
+    "coefficient": 24500,
+    "color": "#ffe919"
+  },
+  {
+    "id": 4224,
+    "name": "Magnetic Jade Max",
+    "nameZh": "磁玉Max",
+    "brand": "Gateron",
+    "travelUm": 3410,
+    "coefficient": 19500,
+    "color": "#f9e892"
+  },
+  {
+    "id": 4240,
+    "name": "Magnetic Jade POM",
+    "nameZh": "磁玉Pom",
+    "brand": "Gateron",
+    "travelUm": 3300,
+    "coefficient": 20480,
+    "color": "#defccb"
+  },
+  {
+    "id": 4256,
+    "name": "Hanabi / Fireworks",
+    "nameZh": "花火轴",
+    "brand": "Gateron",
+    "travelUm": 3150,
+    "coefficient": 26800,
+    "color": "#ffa70e"
+  },
+  {
+    "id": 4272,
+    "name": "Purple Dragon",
+    "nameZh": "紫龙轴",
+    "brand": "Gateron",
+    "travelUm": 3335,
+    "coefficient": 20300,
+    "color": "#8174f8"
+  },
+  {
+    "id": 4288,
+    "name": "Red Dragon (Lubed)",
+    "nameZh": "赤龙轴(自润)",
+    "brand": "Gateron",
+    "travelUm": 3380,
+    "coefficient": 20044,
+    "color": "#ff4141"
+  },
+  {
+    "id": 4304,
+    "name": "Star Orbit Magnetic",
+    "nameZh": "星轨磁轴",
+    "brand": "Gateron",
+    "travelUm": 3945,
+    "coefficient": 15000,
+    "color": "#0099ff"
+  },
+  {
+    "id": 4320,
+    "name": "Golden Dragon",
+    "nameZh": "金龙轴",
+    "brand": "Gateron",
+    "travelUm": 3340,
+    "coefficient": 21600,
+    "color": "#fcca74"
+  },
+  {
+    "id": 4336,
+    "name": "Snow Blade",
+    "nameZh": "封底雪刀轴",
+    "brand": "Gateron",
+    "travelUm": 3430,
+    "coefficient": 22250,
+    "color": "#d9d9d9"
+  },
+  {
+    "id": 4352,
+    "name": "Kirin / Qilin",
+    "nameZh": "麒麟轴",
+    "brand": "Gateron",
+    "travelUm": 3440,
+    "coefficient": 19100,
+    "color": ""
+  },
+  {
+    "id": 4368,
+    "name": "Sakura Pink",
+    "nameZh": "樱花轴",
+    "brand": "Gateron",
+    "travelUm": 3390,
+    "coefficient": 22000,
+    "color": "#f4abff"
+  },
+  {
+    "id": 4384,
+    "name": "Grey Jade Pro",
+    "nameZh": "灰玉轴Pro",
+    "brand": "Gateron",
+    "travelUm": 3385,
+    "coefficient": 23300,
+    "color": "#e9fcc9"
+  },
+  {
+    "id": 4400,
+    "name": "Xuanwu (Fully Lubed)",
+    "nameZh": "玄武轴(全润)",
+    "brand": "Gateron",
+    "travelUm": 3365,
+    "coefficient": 20800,
+    "color": "#4dfb32"
+  },
+  {
+    "id": 4416,
+    "name": "Dual-Rail White",
+    "nameZh": "双轨磁白轴",
+    "brand": "Gateron",
+    "travelUm": 4015,
+    "coefficient": 13300,
+    "color": "#fff3f3"
+  },
+  {
+    "id": 4432,
+    "name": "Dual-Rail Orange",
+    "nameZh": "双轨磁橙轴",
+    "brand": "Gateron",
+    "travelUm": 4005,
+    "coefficient": 15200,
+    "color": "#fccb68"
+  },
+  {
+    "id": 4464,
+    "name": "Magnetic Yellow",
+    "nameZh": "磁黄轴",
+    "brand": "Gateron",
+    "travelUm": 3970,
+    "coefficient": 15300,
+    "color": "#fff06f"
+  },
+  {
+    "id": 4480,
+    "name": "Magnetic Black",
+    "nameZh": "磁黑轴",
+    "brand": "Gateron",
+    "travelUm": 3400,
+    "coefficient": 17600,
+    "color": "#c1bfbf"
+  },
+  {
+    "id": 4496,
+    "name": "Magnetic Orange",
+    "nameZh": "磁橙轴",
+    "brand": "Gateron",
+    "travelUm": 3935,
+    "coefficient": 19700,
+    "color": "#ffc527"
+  },
+  {
+    "id": 4512,
+    "name": "Magnetic Green",
+    "nameZh": "磁绿轴",
+    "brand": "Gateron",
+    "travelUm": 3895,
+    "coefficient": 17200,
+    "color": "#75ff30"
+  },
+  {
+    "id": 4528,
+    "name": "Silent Zen (Wujing)",
+    "nameZh": "悟静轴",
+    "brand": "Gateron",
+    "travelUm": 3615,
+    "coefficient": 16800,
+    "color": "#f1f888"
+  },
+  {
+    "id": 4544,
+    "name": "Pink Jade Pro",
+    "nameZh": "粉磁玉轴Pro",
+    "brand": "Gateron",
+    "travelUm": 3415,
+    "coefficient": 23000,
+    "color": "#f4bdff"
+  },
+  {
+    "id": 4560,
+    "name": "Pink Jade",
+    "nameZh": "粉玉轴",
+    "brand": "Gateron",
+    "travelUm": 3355,
+    "coefficient": 21300,
+    "color": "#f85ed9"
+  },
+  {
+    "id": 4592,
+    "name": "Emerald Jade",
+    "nameZh": "翠玉轴",
+    "brand": "Gateron",
+    "travelUm": 3355,
+    "coefficient": 22200,
+    "color": "#4bff09"
+  },
+  {
+    "id": 4608,
+    "name": "Jade Blade",
+    "nameZh": "玉刃轴",
+    "brand": "Gateron",
+    "travelUm": 3475,
+    "coefficient": 22200,
+    "color": ""
+  },
+  {
+    "id": 8208,
+    "name": "Magneto King",
+    "nameZh": "万磁王",
+    "brand": "TTC",
+    "travelUm": 3420,
+    "coefficient": 20500,
+    "color": "#fb4848"
+  },
+  {
+    "id": 8224,
+    "name": "Magneto King RGB",
+    "nameZh": "万磁王RGB",
+    "brand": "TTC",
+    "travelUm": 3390,
+    "coefficient": 20100,
+    "color": "#ff2121"
+  },
+  {
+    "id": 8240,
+    "name": "POM Magneto King",
+    "nameZh": "Pom万磁王",
+    "brand": "TTC",
+    "travelUm": 3390,
+    "coefficient": 21400,
+    "color": "#e3dcff"
+  },
+  {
+    "id": 8256,
+    "name": "Green Snake",
+    "nameZh": "青蛇轴",
+    "brand": "TTC",
+    "travelUm": 3420,
+    "coefficient": 20600,
+    "color": "#69ff1f"
+  },
+  {
+    "id": 8272,
+    "name": "White Snake",
+    "nameZh": "白蛇轴",
+    "brand": "TTC",
+    "travelUm": 3410,
+    "coefficient": 20800,
+    "color": "#e8e8e8"
+  },
+  {
+    "id": 8288,
+    "name": "Sweetheart Magneto",
+    "nameZh": "爱心万磁王",
+    "brand": "TTC",
+    "travelUm": 3390,
+    "coefficient": 20500,
+    "color": "#f8d4e0"
+  },
+  {
+    "id": 8304,
+    "name": "Purple Heart Magneto",
+    "nameZh": "紫心万磁王",
+    "brand": "TTC",
+    "travelUm": 3420,
+    "coefficient": 21000,
+    "color": "#6f43fd"
+  },
+  {
+    "id": 8320,
+    "name": "Sacred Heart Magneto",
+    "nameZh": "圣心万磁王",
+    "brand": "TTC",
+    "travelUm": 3450,
+    "coefficient": 19800,
+    "color": "#fffafa"
+  },
+  {
+    "id": 8336,
+    "name": "Sun God / Apollo",
+    "nameZh": "太阳神轴",
+    "brand": "TTC",
+    "travelUm": 3420,
+    "coefficient": 21000,
+    "color": "#ff8000"
+  },
+  {
+    "id": 8352,
+    "name": "Sky King",
+    "nameZh": "天王轴",
+    "brand": "TTC",
+    "travelUm": 3460,
+    "coefficient": 20900,
+    "color": "#60daff"
+  },
+  {
+    "id": 8368,
+    "name": "Sky King Esports",
+    "nameZh": "天王轴电竞",
+    "brand": "TTC",
+    "travelUm": 3450,
+    "coefficient": 20100,
+    "color": "#f9a748"
+  },
+  {
+    "id": 8384,
+    "name": "Sky King SE",
+    "nameZh": "天王SE",
+    "brand": "TTC",
+    "travelUm": 3440,
+    "coefficient": 18352,
+    "color": "#e8fff4"
+  },
+  {
+    "id": 8400,
+    "name": "Soldier King",
+    "nameZh": "兵王轴",
+    "brand": "TTC",
+    "travelUm": 3480,
+    "coefficient": 20500,
+    "color": "#af7c05"
+  },
+  {
+    "id": 8416,
+    "name": "Soldier King Pro",
+    "nameZh": "兵王轴Pro",
+    "brand": "TTC",
+    "travelUm": 3440,
+    "coefficient": 21000,
+    "color": "#ffdf5d"
+  },
+  {
+    "id": 8432,
+    "name": "Ice Snow (Lingxue)",
+    "nameZh": "凌雪轴",
+    "brand": "TTC",
+    "travelUm": 3510,
+    "coefficient": 20000,
+    "color": "#28f0ff"
+  },
+  {
+    "id": 8448,
+    "name": "Dragon God",
+    "nameZh": "龙神轴",
+    "brand": "TTC",
+    "travelUm": 3470,
+    "coefficient": 19100,
+    "color": "#9131fd"
+  },
+  {
+    "id": 8464,
+    "name": "Elf King",
+    "nameZh": "精灵王轴",
+    "brand": "TTC",
+    "travelUm": 3470,
+    "coefficient": 19500,
+    "color": "#6cfff6"
+  },
+  {
+    "id": 8480,
+    "name": "Tai-A Sword",
+    "nameZh": "太阿磁轴",
+    "brand": "TTC",
+    "travelUm": 3470,
+    "coefficient": 19700,
+    "color": "#ffb93f"
+  },
+  {
+    "id": 8496,
+    "name": "Kotai Magnetic",
+    "nameZh": "科泰轴",
+    "brand": "TTC",
+    "travelUm": 3420,
+    "coefficient": 16672,
+    "color": "#f2bc05"
+  },
+  {
+    "id": 19504,
+    "name": "Cullinan",
+    "nameZh": "库里南轴",
+    "brand": "TTC",
+    "travelUm": 3600,
+    "coefficient": 19456,
+    "color": "#eaeaea"
+  },
+  {
+    "id": 12336,
+    "name": "Babao Alpha",
+    "nameZh": "八宝轴α",
+    "brand": "Other",
+    "travelUm": 3500,
+    "coefficient": 22000,
+    "color": "#f2f2f2"
+  },
+  {
+    "id": 12352,
+    "name": "Babao Linear",
+    "nameZh": "八宝轴L",
+    "brand": "Other",
+    "travelUm": 3500,
+    "coefficient": 20200,
+    "color": "#ece8e8"
+  },
+  {
+    "id": 12368,
+    "name": "Ice Emperor",
+    "nameZh": "冰皇轴",
+    "brand": "Other",
+    "travelUm": 3360,
+    "coefficient": 20500,
+    "color": "#eeeeee"
+  },
+  {
+    "id": 12400,
+    "name": "Titanium Ti",
+    "nameZh": "ti轴",
+    "brand": "Other",
+    "travelUm": 3340,
+    "coefficient": 20200,
+    "color": "#d9c5b3"
+  },
+  {
+    "id": 12416,
+    "name": "Ascension Pro",
+    "nameZh": "登神Pro",
+    "brand": "Other",
+    "travelUm": 3360,
+    "coefficient": 21300,
+    "color": "#caa1ff"
+  },
+  {
+    "id": 12432,
+    "name": "UR Ice Magnetic",
+    "nameZh": "UR冰磁轴",
+    "brand": "Other",
+    "travelUm": 3310,
+    "coefficient": 20500,
+    "color": "#ffd9d9"
+  },
+  {
+    "id": 12448,
+    "name": "Koi Carp",
+    "nameZh": "锦鲤轴",
+    "brand": "Other",
+    "travelUm": 3340,
+    "coefficient": 21500,
+    "color": "#fcadad"
+  },
+  {
+    "id": 12464,
+    "name": "Wukong",
+    "nameZh": "悟空轴",
+    "brand": "Other",
+    "travelUm": 3390,
+    "coefficient": 20100,
+    "color": "#ebebeb"
+  },
+  {
+    "id": 12512,
+    "name": "Pink Emperor",
+    "nameZh": "粉皇轴",
+    "brand": "Other",
+    "travelUm": 3450,
+    "coefficient": 21600,
+    "color": "#ffe043"
+  },
+  {
+    "id": 12560,
+    "name": "Xingyi Martial",
+    "nameZh": "形意轴",
+    "brand": "Other",
+    "travelUm": 3380,
+    "coefficient": 20000,
+    "color": "#dddddd"
+  },
+  {
+    "id": 12608,
+    "name": "Skyline Magnetic (3.55 mm)",
+    "nameZh": "天际线轴",
+    "brand": "Other",
+    "travelUm": 3550,
+    "coefficient": 18600,
+    "color": "#d3e4ff"
+  },
+  {
+    "id": 12656,
+    "name": "God of Magnetism",
+    "nameZh": "磁神轴",
+    "brand": "Other",
+    "travelUm": 3470,
+    "coefficient": 21000,
+    "color": "#049217"
+  },
+  {
+    "id": 12704,
+    "name": "Azure Sky Pro",
+    "nameZh": "天青轴Pro",
+    "brand": "Other",
+    "travelUm": 3610,
+    "coefficient": 18100,
+    "color": "#74e1fd"
+  },
+  {
+    "id": 12720,
+    "name": "Purple Star",
+    "nameZh": "紫星轴",
+    "brand": "Other",
+    "travelUm": 3550,
+    "coefficient": 18600,
+    "color": "#cbadff"
+  },
+  {
+    "id": 12736,
+    "name": "Chixiao Imperial Sword",
+    "nameZh": "赤霄轴",
+    "brand": "Other",
+    "travelUm": 3540,
+    "coefficient": 19900,
+    "color": "#fff897"
+  },
+  {
+    "id": 13088,
+    "name": "Ultra-Magnetic Pro+",
+    "nameZh": "极磁轴Pro+",
+    "brand": "Other",
+    "travelUm": 3650,
+    "coefficient": 17300,
+    "color": "#fcc4b5"
+  },
+  {
+    "id": 13104,
+    "name": "Ultra-Magnetic Pro",
+    "nameZh": "极磁轴Pro",
+    "brand": "Other",
+    "travelUm": 3585,
+    "coefficient": 18500,
+    "color": "#fedada"
+  },
+  {
+    "id": 13120,
+    "name": "Ultra-Magnetic RGB",
+    "nameZh": "极磁轴RGB",
+    "brand": "Other",
+    "travelUm": 3580,
+    "coefficient": 19000,
+    "color": "#fff6f6"
+  },
+  {
+    "id": 13136,
+    "name": "Ultra-Mag Zhuohua",
+    "nameZh": "极磁-灼华轴",
+    "brand": "Other",
+    "travelUm": 3645,
+    "coefficient": 16950,
+    "color": "#f7d8fe"
+  },
+  {
+    "id": 13152,
+    "name": "Ultra-Mag Hunyuan",
+    "nameZh": "极磁-混元轴",
+    "brand": "Other",
+    "travelUm": 3655,
+    "coefficient": 19200,
+    "color": "#e4e4e4"
+  },
+  {
+    "id": 13168,
+    "name": "Ultra-Mag Black Jade",
+    "nameZh": "极磁-墨玉轴",
+    "brand": "Other",
+    "travelUm": 3605,
+    "coefficient": 18900,
+    "color": "#d3f89c"
+  },
+  {
+    "id": 13184,
+    "name": "Ultra-Mag Sakura Clear",
+    "nameZh": "极磁-樱澈轴",
+    "brand": "Other",
+    "travelUm": 3625,
+    "coefficient": 22200,
+    "color": "#f2b9f8"
+  },
+  {
+    "id": 13264,
+    "name": "Siren",
+    "nameZh": "海妖轴",
+    "brand": "Other",
+    "travelUm": 3793,
+    "coefficient": 17536,
+    "color": "#e89ab1"
+  },
+  {
+    "id": 13472,
+    "name": "Skyline Magnetic (3.50 mm)",
+    "nameZh": "天际线轴",
+    "brand": "Other",
+    "travelUm": 3500,
+    "coefficient": 17536,
+    "color": "#4dd1f9"
+  },
+  {
+    "id": 13665,
+    "name": "Bingyao Obsidian",
+    "nameZh": "冰曜轴",
+    "brand": "Other",
+    "travelUm": 3200,
+    "coefficient": 25728,
+    "color": "#54a9e1"
+  },
+  {
+    "id": 13681,
+    "name": "Xueyao Snow Obsidian",
+    "nameZh": "雪曜轴",
+    "brand": "Other",
+    "travelUm": 3200,
+    "coefficient": 25728,
+    "color": "#ffffff"
+  },
+  {
+    "id": 14544,
+    "name": "White Wukong",
+    "nameZh": "白色悟空轴",
+    "brand": "Other",
+    "travelUm": 3400,
+    "coefficient": 17664,
+    "color": "#ffffff"
+  },
+  {
+    "id": 14608,
+    "name": "Yaoguang",
+    "nameZh": "瑶光轴",
+    "brand": "Other",
+    "travelUm": 3200,
+    "coefficient": 18432,
+    "color": "#ede8cb"
+  },
+  {
+    "id": 14864,
+    "name": "Studio 035",
+    "nameZh": "035轴",
+    "brand": "Other",
+    "travelUm": 3400,
+    "coefficient": 18688,
+    "color": "#ababab"
+  },
+  {
+    "id": 14240,
+    "name": "Pink Lotus",
+    "nameZh": "粉藕轴",
+    "brand": "Wuque Studio",
+    "travelUm": 3443,
+    "coefficient": 21888,
+    "color": "#f4c9cc"
+  },
+  {
+    "id": 14256,
+    "name": "Deep Sea Whisperer",
+    "nameZh": "深海低语者",
+    "brand": "Wuque Studio",
+    "travelUm": 3450,
+    "coefficient": 21888,
+    "color": "#d9e2f4"
+  },
+  {
+    "id": 14656,
+    "name": "Heart of the Ocean",
+    "nameZh": "海洋之心",
+    "brand": "Wuque Studio",
+    "travelUm": 3555,
+    "coefficient": 24576,
+    "color": "#eaf0f7"
+  },
+  {
+    "id": 14672,
+    "name": "Cullinan",
+    "nameZh": "库里南",
+    "brand": "Wuque Studio",
+    "travelUm": 3534,
+    "coefficient": 24576,
+    "color": "#f8f5f5"
+  }
+]

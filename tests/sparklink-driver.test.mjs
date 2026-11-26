@@ -23,9 +23,9 @@ const le = v => [v & 0xff, (v >> 8) & 0xff]
  * keycodes; layout style words are row:5 col:7 ratio:4 in quarter units;
  * performance values are micrometres.
  */
-function fakeBoard({ magnetic = true, rows = [15, 15, 14, 14, 10], profiles = 4, rates = [0, 1, 3, 6] } = {}) {
+function fakeBoard({ magnetic = true, rows = [15, 15, 14, 14, 10], profiles = 4, rates = [0, 1, 3, 6], spaceGap = 0, axes = [] } = {}) {
   const N_LAYERS = 4
-  const state = { profile: 0, rate: 3, writes: [], saves: [], resets: 0 }
+  const state = { profile: 0, rate: 3, writes: [], saves: [], resets: 0, calibrated: null, calibrating: false }
   // macros: shared by every profile, 16 slots of up to 60 actions
   const macros = Array.from({ length: 16 }, () => ({ header: [0, 0, 0, 0, 0, 0], actions: new Array(60 * 4).fill(0) }))
   const cfg = Array.from({ length: profiles }, () => ({
@@ -39,8 +39,10 @@ function fakeBoard({ magnetic = true, rows = [15, 15, 14, 14, 10], profiles = 4,
   let usage = 0x04
   rows.forEach((n, r) => {
     let x = 0
-    for (let c = 0; c < n; c++) {
-      const ratio = c === 0 && r > 0 ? 3 : r === 4 && c === 3 ? 9 : 1 // 1.5u first key, a space bar
+    for (let k = 0; k < n; k++) {
+      // spaceGap: the bottom row's keys after the space bar sit further along the matrix
+      const c = r === 4 && k > 3 ? k + spaceGap : k
+      const ratio = k === 0 && r > 0 ? 3 : r === 4 && k === 3 ? 9 : 1 // 1.5u first key, a space bar
       const w = { 1: 1, 3: 1.5, 9: 6.25 }[ratio]
       style[r][c] = (((r * 4) & 0x1f) << 11) | (((x * 4) & 0x7f) << 4) | ratio
       x += w
@@ -101,7 +103,11 @@ function fakeBoard({ magnetic = true, rows = [15, 15, 14, 14, 10], profiles = 4,
         state.writes.push(['perf', req[2], req[3]])
         break
       }
-      case 0x0403: out[2] = req[2]; out[3] = req[3]; (route.get(req[3]) ?? []).forEach((v, i) => out.set(le(v), 4 + i * 2)); break
+      case 0x0403:
+        out[2] = req[2]; out[3] = req[3]
+        if (req[2] === 2) for (let c = 0; c < 21; c++) out.set(le(state.calibrated?.has(`${req[3]}:${c}`) ? 2 : 1), 4 + c * 2)
+        else (route.get(req[3]) ?? []).forEach((v, i) => out.set(le(v), 4 + i * 2))
+        break
       case 0x0201: state.resets++; out[3] = 0xff; break
       case 0x0202: state.saves.push(req[2]); out[3] = req[2]; break
       case 0x0203:
@@ -117,6 +123,12 @@ function fakeBoard({ magnetic = true, rows = [15, 15, 14, 14, 10], profiles = 4,
       case 0x020c: out[3] = 10; break
       case 0x0208: out[3] = 2; out.set([0, 87, 6, 21, 1, 12, 1, 12], 4); break
       case 0x020a: out[3] = 1; break
+      case 0x0207: out[3] = axes.length; axes.forEach((a, i) => out.set(le(a), 4 + i * 2)); break
+      case 0x0206:
+        state.calibrating = req[2] === 0
+        if (state.calibrating) state.calibrated = new Set()
+        state.writes.push(['calibration', req[2]])
+        break
       case 0x0501: {
         out[2] = req[2]; out[3] = req[3]
         const a = light[req[2]]
@@ -266,7 +278,9 @@ test('actuation: modes, one actuation point, untouched switch fields, save', asy
   assert.equal(k0.rtFirstTouch, 400); assert.equal(k0.normalPress, 1500) // the plain point stays
   assert.equal(k0.rtPress, 100); assert.equal(k0.rtRelease, 200)
   assert.equal(k0.pressDead, 100); assert.equal(k0.releaseDead, 300)
-  assert.equal(k0.axisV2Id, 0x0102); assert.equal(k0.axisCoefficient, 77); assert.equal(k0.calibrate, 1)
+  assert.equal(k0.axisV2Id, 0x0102); assert.equal(k0.axisCoefficient, 77)
+  // the calibrate byte goes out as 0, as the vendor app sends it, so no key is left flagged
+  assert.equal(k0.calibrate, 0)
   assert.equal(cfg[0].perf.get('0:1').mode, 1) // continuous
   const back = await d.getActuation(0)
   assert.deepEqual(back[0], { ...act[0], releaseMm: 1.2 })
@@ -549,4 +563,79 @@ test('the Sparklink demo board: a 75 % layout that reads and writes like a board
   assert.equal((await d.getKeymap(0, 0))[1], ui.uiHid(0x04))
   assert.ok(d.lightingInfo().perKey)
   await d.close()
+})
+
+test('calibration: start, every key\'s progress by row and column, finish and save', async () => {
+  const { transport, state } = fakeBoard()
+  const d = await SparklinkDriver.connect(transport, usb)
+  assert.equal(d.capabilities.calibration, true)
+  await d.startCalibration()
+  assert.equal(state.calibrating, true)
+  let p = await d.calibrationProgress()
+  assert.equal(p.length, d.layout.keys.length)
+  assert.equal(p.filter(Boolean).length, 0)
+  // the board learns key (1,2) = layout key 17 and key (0,0)
+  state.calibrated.add('1:2'); state.calibrated.add('0:0')
+  p = await d.calibrationProgress()
+  assert.deepEqual(p.flatMap((ok, i) => (ok ? [i] : [])), [0, 17])
+  await d.finishCalibration()
+  assert.deepEqual(state.writes.filter(w => w[0] === 'calibration'), [['calibration', 0], ['calibration', 1]])
+  assert.equal(state.saves.at(-1), 0x01)
+})
+
+test('axis replies are matched on kind and row too (the board streams the others)', async () => {
+  const { transport, state } = fakeBoard()
+  const d = await SparklinkDriver.connect(transport, usb)
+  // a stream frame for another row and kind arrives before the answer
+  const inner = transport.exchange.bind(transport)
+  transport.exchange = async (req, t, accept) => {
+    if (req[0] === 4 && req[1] === 3) {
+      const stray = new Uint8Array(64); stray.set([4, 3, 1, (req[3] + 1) % 5])
+      assert.equal(accept(stray), false)
+      const other = new Uint8Array(64); other.set([4, 3, 0, req[3]])
+      assert.equal(accept(other), false)
+    }
+    return inner(req, t, accept)
+  }
+  state.calibrated = new Set(['2:3'])
+  const p = await d.calibrationProgress()
+  assert.equal(p.filter(Boolean).length, 1)
+})
+
+test('switch selector: Sparklink catalog ids, three fields per key, only on boards without their own list', async () => {
+  const plain = fakeBoard({ axes: [0x0101, 0x0102] })
+  const d1 = await SparklinkDriver.connect(plain.transport, usb)
+  assert.deepEqual(d1.switchCatalog(), [])
+  const { transport, state, cfg } = fakeBoard()
+  const d = await SparklinkDriver.connect(transport, usb)
+  const cat = d.switchCatalog()
+  assert.ok(cat.length > 80)
+  const jade = cat.find(c => c.name === 'Magnetic Jade')
+  assert.equal(jade.id, 'axis-4112'); assert.equal(jade.travelMm, 3.43); assert.equal(jade.brand, 'Gateron')
+  assert.ok(cat.some(c => c.id === 'unset'))
+  // the fake's keys carry an id that is not in the catalog
+  const setup = await d.getSwitchSetup()
+  assert.ok(setup.keySwitch.every(id => id === 'unset'))
+  const next = { ...setup, keySwitch: setup.keySwitch.map((id, i) => (i < 2 ? 'axis-4112' : id)) }
+  await d.setSwitchSetup(next)
+  const k = cfg[0].perf.get('0:1')
+  assert.deepEqual([k.axisV2Id, k.axisRangeMax, k.axisCoefficient], [4112, 3430, 22800])
+  assert.equal(cfg[0].perf.get('0:2').axisV2Id, 0x0102) // untouched
+  assert.deepEqual(state.writes.filter(w => w[0] === 'perf'), [['perf', 0, 0], ['perf', 0, 1]])
+  assert.equal(state.saves.at(-1), 0x02)
+  assert.deepEqual((await d.getSwitchSetup()).keySwitch.slice(0, 3), ['axis-4112', 'axis-4112', 'unset'])
+  await assert.rejects(d.setSwitchSetup({ ...next, keySwitch: next.keySwitch.map(() => 'axis-1') }), /not in the catalog/)
+})
+
+test('per-key colours: a wide key also lights the unowned LEDs to its right', async () => {
+  // the space bar (row 4, col 3, 6.25u) with the next key at col 8
+  const { transport, state } = fakeBoard({ spaceGap: 4 })
+  const d = await SparklinkDriver.connect(transport, usb)
+  const space = d.layout.keys.findIndex(k => k.w > 6)
+  const colors = new Array(d.layout.keys.length).fill(null)
+  colors[space] = 0x00ff00
+  await d.setPerKeyColors(colors, false)
+  const lit = state.cells.flatMap((c, i) => (c[3] === 0xff ? [i] : []))
+  assert.deepEqual(lit, [87, 88, 89, 90, 91]) // 4 * 21 + 3 .. 7
+  assert.equal((await d.getPerKeyColors())[space], 0x00ff00)
 })

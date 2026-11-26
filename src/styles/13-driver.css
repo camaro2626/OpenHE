@@ -1007,3 +1007,23 @@
   align-items: center;
   gap: 6px;
 }
+
+/* guided calibration */
+.drv-guided-cal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+.drv-guided-cal-status {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.drv-guided-cal .hero-key.drv-cal-done {
+  background: rgba(76, 201, 120, 0.28);
+  border-color: rgba(76, 201, 120, 0.8);
+}
+.drv-switch-cal-note {
+  margin-top: 12px;
+}

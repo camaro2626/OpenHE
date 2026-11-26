@@ -360,6 +360,10 @@ export type SwitchCatalogEntry = {
   tunable: boolean;
   /** Default travel curve (board-specific meaning) for tunable switches. */
   curve?: number;
+  /** The switch's own colour, #rrggbb, for its swatch. */
+  color?: string;
+  /** A line under the name (travel, original name ...). */
+  detail?: string;
 };
 
 export type SwitchTuning = { travelMm: number; curve: number };
@@ -450,6 +454,16 @@ export interface KeyboardDriver {
   extraKeycodes?(): Array<{ value: UiKeycode; label: string }>;
 
   recalibrate?(): Promise<void>;
+  /**
+   * Guided calibration (Sparklink): start, then press every key to the
+   * bottom while `calibrationProgress` reports which layout keys the board
+   * has learned, then finish (which saves).
+   */
+  startCalibration?(): Promise<void>;
+  calibrationProgress?(): Promise<boolean[]>;
+  finishCalibration?(): Promise<void>;
+  /** Changing a key's switch clears its calibration (Sparklink). */
+  readonly switchChangeNeedsCalibration?: boolean;
   factoryReset?(): Promise<void>;
 }
 

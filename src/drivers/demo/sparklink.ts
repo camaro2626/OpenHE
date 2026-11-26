@@ -78,7 +78,8 @@ function sparklinkBoard(): ReportTransport {
     });
   });
   type Perf = number[];
-  const perfOf = (): Perf => [0, 1500, 1200, 300, 150, 150, 0, 0, 3, 1, 0x0102, 3800, 77];
+  // Gateron Magnetic Jade from Sparklink's switch catalog
+  const perfOf = (): Perf => [0, 1500, 1200, 300, 150, 150, 0, 0, 0, 2, 4112, 3430, 22800];
   const cfg = Array.from({ length: PROFILES }, () => ({
     keys: Array.from({ length: 4 }, (_, layer) =>
       Array.from({ length: 8 }, (_, r) =>
@@ -101,6 +102,7 @@ function sparklinkBoard(): ReportTransport {
     1: { base: [1, 1, 60, 40, 0, 0], pal: Array.from({ length: 8 }, () => [255, 80, 0, 255]) }
   };
   const cells = Array.from({ length: 135 }, () => [0, 0, 0, 0]);
+  const cal: { since: number | null } = { since: null };
   const started = performance.now();
 
   const reply = (q: Uint8Array): Uint8Array => {
@@ -166,6 +168,12 @@ function sparklinkBoard(): ReportTransport {
       case 0x0403: {
         o[2] = q[2];
         o[3] = q[3];
+        if (q[2] === 2) {
+          // calibrating: keys come in over a few seconds, as if pressed in turn
+          const t = cal.since === null ? Infinity : (performance.now() - cal.since) / 120;
+          for (let c = 0; c < 21; c++) o.set(le(q[3] * 16 + c < t ? 2 : 1), 4 + c * 2);
+          break;
+        }
         const ms = performance.now() - started;
         // a few keys pressing in turn: WASD and space
         const moving: Record<string, number> = {
@@ -212,6 +220,13 @@ function sparklinkBoard(): ReportTransport {
         break;
       case 0x020a:
         o[3] = 1;
+        break;
+      case 0x0207:
+        // no list of its own: keys take switches from the catalog
+        o[3] = 0;
+        break;
+      case 0x0206:
+        cal.since = q[2] === 0 ? performance.now() : null;
         break;
       case 0x0501: {
         const a = light[q[2]];

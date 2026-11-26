@@ -242,7 +242,8 @@ export function setPerformance(row: number, col: number, p: SlPerformance): Uint
     ...um(p.pressDead),
     ...um(p.releaseDead),
     p.axis,
-    p.calibrate,
+    // the vendor app always sends 0 here, so no key is left flagged as calibrating
+    0,
     ...le16(p.axisV2Id),
     ...le16(p.axisRangeMax),
     ...le16(p.axisCoefficient)
@@ -254,6 +255,10 @@ export const getRoute = (row: number) =>
   packet([Group.PERFORMANCE, PerfCmd.AXIS_DATA, AxisData.ROUTE, row]);
 export const getAdc = (row: number) =>
   packet([Group.PERFORMANCE, PerfCmd.AXIS_DATA, AxisData.ADC, row]);
+/** Each key's calibration state in one row; 2 means calibrated. */
+export const getCalibrationRow = (row: number) =>
+  packet([Group.PERFORMANCE, PerfCmd.AXIS_DATA, AxisData.CALIBRATE, row]);
+export const CALIBRATED = 2;
 
 export function parseAxisRow(d: Uint8Array): number[] {
   const out: number[] = [];
@@ -275,8 +280,18 @@ export const rateRead = () => packet([Group.GLOBAL, GlobalCmd.REPORT_RATE, CRW.R
 export const rateWrite = (code: number) =>
   packet([Group.GLOBAL, GlobalCmd.REPORT_RATE, CRW.WRITE, code]);
 export const rtPrecision = () => packet([Group.GLOBAL, GlobalCmd.RT_PRECISION, 0x00]);
+/**
+ * Calibration: start (the board learns each key's rest and bottom-out while
+ * they are pressed) and finish; save Area.CALIBRATION afterwards.
+ */
 export const calibration = (open: boolean) =>
   packet([Group.GLOBAL, GlobalCmd.CALIBRATION, open ? 0x00 : 0x01]);
+/**
+ * The board's own switch list. Empty means "unlimited switches": each key
+ * stores its switch as axisV2Id, axisRangeMax and axisCoefficient in its
+ * performance record, from Sparklink's switch catalog.
+ */
+export const axisList = () => packet([Group.GLOBAL, GlobalCmd.AXIS_LIBRARY, CRW.LIST]);
 
 /** `[count, codes...]` lists (profiles, report rates) start at byte 3. */
 export function parseList(d: Uint8Array): number[] {

@@ -230,7 +230,7 @@ export function DriverApp({ driver }: { driver: KeyboardDriver }) {
       id: 'calibration',
       label: 'Calibration',
       icon: <Crosshair size={18} />,
-      show: !!(driver.recalibrate || driver.setCalibration)
+      show: !!(driver.recalibrate || driver.setCalibration || driver.startCalibration)
     },
     { id: 'device', label: 'About this Keyboard', icon: <Info size={18} />, show: true }
   ];
@@ -254,7 +254,7 @@ export function DriverApp({ driver }: { driver: KeyboardDriver }) {
         case 'switches':
           return <SwitchesPage driver={driver} model={model} sw={sw} busy={!!busy} run={run} />;
         case 'calibration':
-          return <CalibrationSettingsPage driver={driver} busy={!!busy} run={run} />;
+          return <CalibrationSettingsPage driver={driver} model={model} busy={!!busy} run={run} />;
         default:
           return (
             <DevicePage

@@ -40,7 +40,9 @@ const BY_NAME: Array<[RegExp, Pictures]> = [
   [/jade\s*(pro|gaming)/i, openAula('jade-pro')],
   // TTC KOM is sold as "Magneto"; the PRO is the white-stem, white-base one
   [/^\s*magneto\s*pro\s*$/i, openAula('white')],
-  [/^\s*magneto\s*$/i, recolour(ttcKomFront, ttcKomTop)]
+  [/^\s*magneto\s*$/i, recolour(ttcKomFront, ttcKomTop)],
+  // Sparklink's catalog: TTC's 万磁王 is the KOM
+  [/^\s*magneto king\s*$/i, recolour(ttcKomFront, ttcKomTop)]
 ];
 const ACCENT: Record<string, string> = {
   generic: '#5b6268',
@@ -60,6 +62,7 @@ function imagesFor(c: SwitchCatalogEntry): Pictures {
 
 const accentFor = (c: SwitchCatalogEntry) =>
   ACCENT[c.id] ??
+  c.color ??
   (/jade/i.test(c.name) ? '#3fbf8f' : /^\s*magneto\s*$/i.test(c.name) ? '#e0222c' : '#9ba3a8');
 
 export const switchOptionId = (catalogId: string) => `drv:${catalogId}` as SwitchTone;
@@ -86,7 +89,7 @@ export function useSwitchSetup(driver: KeyboardDriver, model: HeroDeviceModelId)
             ? `${travel.toFixed(2)} mm travel`
             : c.id === 'unset'
               ? 'Left as it is'
-              : '',
+              : (c.detail ?? ''),
           travelMm: travel,
           ...imagesFor(c)
         };
