@@ -47,6 +47,19 @@ export const driverConnection = {
     }
   },
 
+  /** A board in software, to try the app without one. */
+  async demo(kind: 'sparklink' | 'rongyuan'): Promise<void> {
+    if (current.state === 'connecting') return;
+    if (current.state === 'connected') await current.driver.close().catch(() => undefined);
+    set({ state: 'connecting' });
+    try {
+      const { connectDemo } = await import('../drivers/demo/index');
+      set({ state: 'connected', driver: await connectDemo(kind) });
+    } catch (err) {
+      set({ state: 'idle', error: message(err) });
+    }
+  },
+
   /** Quietly reopen a board granted in an earlier visit. */
   restore(): Promise<void> {
     if (current.state !== 'idle') return Promise.resolve();

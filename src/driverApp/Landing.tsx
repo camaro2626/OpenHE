@@ -7,6 +7,7 @@ import {
   Lightbulb,
   ListOrdered,
   Loader2,
+  PlayCircle,
   Activity
 } from 'lucide-react';
 import logo from '../assets/openhe-logo.png';
@@ -23,7 +24,7 @@ const FAMILIES = [
   {
     name: 'Sparklink magnetic boards',
     detail:
-      'About 550 boards on Sparklink’s firmware (protocol v2), from its own published protocol: IROK, EWEADN, CAROTMAS, Everglide, Weikav, AULA AG75 and more. Early support: keymap, actuation, rapid trigger, live travel.'
+      'About 550 boards on Sparklink’s firmware (protocol v2), from its own published protocol: IROK, EWEADN, CAROTMAS, Everglide, Weikav, AULA AG75 and more. Keymap, actuation, rapid trigger, advanced keys, macros, lighting and live travel.'
   },
   {
     name: 'RongYuan magnetic boards',
@@ -48,7 +49,7 @@ const FEATURES = [
   {
     icon: Lightbulb,
     title: 'Lighting',
-    text: 'Your board’s own effects, colours and edge light (RongYuan).'
+    text: 'Your board’s own effects, colours, edge light and per-key colours.'
   },
   {
     icon: Activity,
@@ -91,6 +92,25 @@ export function Landing() {
             <span className="landing-hint">
               Plug the keyboard in by cable, then pick it in the browser's list.
             </span>
+          </div>
+          <div className="landing-demo">
+            <span>No keyboard to hand? Try a demo board:</span>
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={connecting}
+              onClick={() => void driverConnection.demo('sparklink')}
+            >
+              <PlayCircle size={15} /> Sparklink demo
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={connecting}
+              onClick={() => void driverConnection.demo('rongyuan')}
+            >
+              <PlayCircle size={15} /> RongYuan demo
+            </button>
           </div>
           {!supported && (
             <div className="landing-note is-error">

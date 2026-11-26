@@ -533,3 +533,20 @@ test('per-key colours: LED cells row * 21 + col, painted flag, overlay or per-ke
   assert.deepEqual(state.writes.slice(writes), [['light', 0, 0]])
   assert.equal(state.light[0].base[1], 16)
 })
+
+test('the Sparklink demo board: a 75 % layout that reads and writes like a board', async () => {
+  const { demoSparklink } = await bundle('src/drivers/demo/sparklink.ts')
+  const d = await demoSparklink()
+  assert.equal(d.info.name, 'Demo board')
+  assert.equal(d.layout.keys.length, 84)
+  // six rows, 16 units wide, Fn on the bottom row
+  assert.equal(Math.max(...d.layout.keys.map(k => k.x + k.w)), 16)
+  assert.equal(new Set(d.layout.keys.map(k => k.y)).size, 6)
+  assert.ok(d.layout.keys.some(k => k.label === 'F12'))
+  const keys = await d.getKeymap(0, 0)
+  keys[1] = ui.uiHid(0x04)
+  await d.setKeymap(0, 0, keys)
+  assert.equal((await d.getKeymap(0, 0))[1], ui.uiHid(0x04))
+  assert.ok(d.lightingInfo().perKey)
+  await d.close()
+})

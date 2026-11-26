@@ -991,3 +991,19 @@
   align-items: center;
   gap: 6px;
 }
+
+/* demo boards on the start screen */
+.landing-demo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  color: var(--text-3, #9aa3a6);
+  font-size: 13px;
+}
+.landing-demo .secondary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
