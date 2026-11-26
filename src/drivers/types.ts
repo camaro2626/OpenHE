@@ -310,6 +310,17 @@ export type LightingInfo = {
   canSwitchOff: boolean;
   /** Rainbow and fixed colour can be read the other way round on this board. */
   flagOrder?: { swapped: boolean; fromRegistry: boolean };
+  /** Per-key colours (`getPerKeyColors` / `setPerKeyColors`). */
+  perKey?: PerKeyLighting;
+};
+
+export type PerKeyLighting = {
+  /** Backlight effect that shows the pattern. */
+  mode: number;
+  /** The board reads its pattern back; otherwise OpenHE keeps it on this computer. */
+  readable: boolean;
+  /** Unpainted keys keep the current effect (true) or stay dark (false). */
+  overlay: boolean;
 };
 
 export type LightSetting = {
@@ -400,6 +411,10 @@ export interface KeyboardDriver {
   getLighting?(): Promise<LightingState>;
   setBacklight?(setting: LightSetting): Promise<void>;
   setSideLight?(setting: LightSetting): Promise<void>;
+  /** Per layout key, 0xRRGGBB or null for unpainted (`lightingInfo().perKey.readable`). */
+  getPerKeyColors?(): Promise<Array<number | null>>;
+  /** Write the pattern, per layout key; `show` also switches the backlight to `perKey.mode`. */
+  setPerKeyColors?(colors: ReadonlyArray<number | null>, show: boolean): Promise<void>;
   setLightsOff?(off: { backlightOff?: boolean; sideOff?: boolean }): Promise<void>;
   /** The owner says the board reads rainbow/fixed the other way round. */
   setLightFlagOrder?(swapped: boolean): void;

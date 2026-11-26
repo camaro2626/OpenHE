@@ -407,3 +407,49 @@ export const macroReadPacket = (slot: number, page: number) =>
 /** Keymap entry binding a key to a macro slot. Modes: 0 repeat count, 1 toggle, 2 while held. */
 export const MACRO_ENTRY_TAG = 9;
 export type RyMacroMode = 0 | 1 | 2;
+
+// ------------------------------------------------------------- per-key colours
+
+/** Mode that shows the per-key pattern (sharkfin PER_KEY_MODE). */
+export const RY_PER_KEY_MODE = MODE_USER_PICTURE;
+/** 128 matrix slots x RGB; gen2 carries the first 126. */
+export const RY_PER_KEY_SLOTS = 128;
+const USERPIC_OP = 0x0c;
+const USERPIC_PAGE = 56;
+const BULK_SENTINEL = 0xff;
+
+/**
+ * The per-key pattern as write packets (sharkfin protocol/mod.rs
+ * userpic_write_packet, gen2.rs userpic_packets). yc500: seven pages with the
+ * total length at bytes 2-3 and the page at byte 4. gen2: pattern slot 0,
+ * 0xFF at byte 2 (anything else commits stale data), page, length, last flag;
+ * the slot is committed to flash when the last page arrives. The board does
+ * not read the pattern back.
+ */
+export function userpicPackets(family: Family, blob: Uint8Array): Uint8Array[] {
+  const out: Uint8Array[] = [];
+  if (family === 'gen2') {
+    const data = blob.subarray(0, (RY_PER_KEY_SLOTS - 2) * 3);
+    const pages = Math.ceil(data.length / USERPIC_PAGE);
+    for (let page = 0; page < pages; page++) {
+      const chunk = data.subarray(page * USERPIC_PAGE, (page + 1) * USERPIC_PAGE);
+      const buf = packet(USERPIC_OP, [
+        0,
+        BULK_SENTINEL,
+        page,
+        chunk.length,
+        page === pages - 1 ? 1 : 0
+      ]);
+      buf.set(chunk, 8);
+      out.push(buf);
+    }
+  } else {
+    const len = RY_PER_KEY_SLOTS * 3;
+    for (let page = 0; page * USERPIC_PAGE < len; page++) {
+      const buf = packet(USERPIC_OP, [0, len & 0xff, len >> 8, page, 0, 0]);
+      buf.set(blob.subarray(page * USERPIC_PAGE, Math.min((page + 1) * USERPIC_PAGE, len)), 8);
+      out.push(buf);
+    }
+  }
+  return out;
+}

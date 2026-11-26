@@ -58,6 +58,8 @@ function fakeBoard({ magnetic = true, rows = [15, 15, 14, 14, 10], profiles = 4,
     1: { base: [1, 1, 40, 20, 1, 0], palette: Array.from({ length: 8 }, () => [0, 255, 0, 255]) }
   }
   state.light = light
+  // per-key cells of the keys' 6 x 21 LED grid, 9 chunks of 15: B G R flag
+  state.cells = Array.from({ length: 135 }, (_, i) => [i, 0, 0, i === 7 ? 0xf0 : 0])
   const reply = req => {
     const out = new Uint8Array(64)
     out[0] = req[0]; out[1] = req[1]
@@ -121,6 +123,13 @@ function fakeBoard({ magnetic = true, rows = [15, 15, 14, 14, 10], profiles = 4,
         if (!a) { out[1] = 0xff; break }
         if (req[3] === 0) out.set(a.base, 4)
         else if (req[3] === 1) out.set(a.palette.flat(), 4)
+        break
+      }
+      case 0x0503: out[2] = req[2]; out[3] = req[3]; out.set(state.cells.slice(req[3] * 15, req[3] * 15 + 15).flat(), 4); break
+      case 0x0504: {
+        for (let i = 0; i < 15; i++) state.cells[req[3] * 15 + i] = [...req.subarray(4 + i * 4, 8 + i * 4)]
+        state.writes.push(['cells', req[3]])
+        out[2] = req[2]; out[3] = req[3]
         break
       }
       case 0x0502: {
@@ -489,4 +498,38 @@ test('lighting: effect, 0-100 brightness and speed, palette colour, on/off, edge
   assert.equal(state.light[0].base[1], 4)
   await d.setSideLight({ ...s.side, speed: 90 })
   assert.equal(state.light[1].base[3], 90)
+})
+
+test('per-key colours: LED cells row * 21 + col, painted flag, overlay or per-key effect', async () => {
+  const { transport, state } = fakeBoard()
+  const d = await SparklinkDriver.connect(transport, usb)
+  assert.deepEqual(d.lightingInfo().perKey, { mode: 16, readable: true, overlay: true })
+  // a cell painted in the vendor app: key (1,2) is layout key 17, cell 23
+  state.cells[23] = [0x30, 0x20, 0x10, 0xff]
+  const colors = await d.getPerKeyColors()
+  assert.equal(colors.length, d.layout.keys.length)
+  assert.equal(colors[17], 0x102030)
+  assert.equal(colors.filter(c => c !== null).length, 1)
+
+  // paint key 0 (cell 0) and key 16 (row 1 col 1 = cell 22); unpaint key 17
+  const next = colors.slice()
+  next[0] = 0xff8000
+  next[16] = 0x0000ff
+  next[17] = null
+  const base = state.light[0].base[1]
+  await d.setPerKeyColors(next, false)
+  assert.deepEqual(state.cells[0], [0x00, 0x80, 0xff, 0xff])
+  assert.deepEqual(state.cells[22], [0xff, 0, 0, 0xff])
+  // unpainted: mark cleared, colour bytes kept
+  assert.deepEqual(state.cells[23], [0x30, 0x20, 0x10, 0])
+  // only the chunks that changed: 0 (cells 0..14) and 1 (15..29)
+  assert.deepEqual(state.writes.filter(w => w[0] === 'cells'), [['cells', 0], ['cells', 1]])
+  assert.equal(state.light[0].base[1], base) // effect untouched
+  assert.ok(state.saves.includes(0x03))
+  // read back; then switch to the per-key effect without rewriting cells
+  assert.deepEqual(await d.getPerKeyColors(), next)
+  const writes = state.writes.length
+  await d.setPerKeyColors(next, true)
+  assert.deepEqual(state.writes.slice(writes), [['light', 0, 0]])
+  assert.equal(state.light[0].base[1], 16)
 })

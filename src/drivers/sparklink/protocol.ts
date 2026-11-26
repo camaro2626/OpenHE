@@ -302,16 +302,22 @@ export const SL_MOUSE: Readonly<Record<number, number>> = {
 
 // ------------------------------------------------------------ lighting
 
-/** Light areas: 0 the keys, 1.. decorative strips. */
+/** Light areas: 0 the keys, 1.. decorative strips; each with its LED grid. */
 export const lightAreas = () => packet([Group.GLOBAL, GlobalCmd.LIGHT_AREAS, 0]);
-export function parseLightAreas(d: Uint8Array): number[] {
+export type SlLightArea = { index: number; count: number; rows: number; cols: number };
+export function parseLightAreas(d: Uint8Array): SlLightArea[] {
   const n = Math.min(d[3], 14);
-  return Array.from({ length: n }, (_, i) => d[4 + i * 4]);
+  return Array.from({ length: n }, (_, i) => ({
+    index: d[4 + i * 4],
+    count: d[5 + i * 4],
+    rows: d[6 + i * 4],
+    cols: d[7 + i * 4]
+  }));
 }
 /** Key lighting on two LED rows (upper and lower) switched separately. */
 export const doubleLighting = () => packet([Group.GLOBAL, GlobalCmd.DOUBLE_LIGHTING, 0]);
 
-export const LightCmd = { READ: 0x01, WRITE: 0x02 } as const;
+export const LightCmd = { READ: 0x01, WRITE: 0x02, CELLS_READ: 0x03, CELLS_WRITE: 0x04 } as const;
 export const LightConfig = { BASE: 0x00, PALETTE: 0x01 } as const;
 /** Brightness and speed run 0..100 (confirmed on an SU66 Max by device-hub). */
 export const LIGHT_MAX = 100;
@@ -360,6 +366,24 @@ export const parsePalette = (d: Uint8Array): number[][] =>
   Array.from({ length: 8 }, (_, i) => Array.from(d.subarray(4 + i * 4, 8 + i * 4)));
 export const setPalette = (area: number, colors: readonly number[][]) =>
   packet([Group.LIGHTING, LightCmd.WRITE, area, LightConfig.PALETTE, ...colors.flat()]);
+
+/**
+ * Per-key colours: the area's LED grid in chunks of 15 cells, each B G R and
+ * a flag. 0xFF marks a painted cell; in mode 16 only painted cells light, in
+ * any other effect they sit on top of it. Reads return the colour each cell
+ * shows now, so only the flag says whether it is painted. Writes are kept.
+ */
+export const LIGHT_CELLS_PER_CHUNK = 15;
+export const LIGHT_PAINTED = 0xff;
+export const LIGHT_PER_KEY_MODE = 16;
+export const getLightCells = (area: number, chunk: number) =>
+  packet([Group.LIGHTING, LightCmd.CELLS_READ, area, chunk]);
+export const parseLightCells = (d: Uint8Array): number[][] =>
+  Array.from({ length: LIGHT_CELLS_PER_CHUNK }, (_, i) =>
+    Array.from(d.subarray(4 + i * 4, 8 + i * 4))
+  );
+export const setLightCells = (area: number, chunk: number, cells: readonly number[][]) =>
+  packet([Group.LIGHTING, LightCmd.CELLS_WRITE, area, chunk, ...cells.flat()]);
 
 // ------------------------------------------------------------ advanced keys
 

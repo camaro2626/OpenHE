@@ -119,6 +119,14 @@ function fakeGen2({ id, revision = 0x0309, layout, profiles = 4 }) {
         break
       }
       case 0x1b: state.stream = req[1]; break
+      case 0x0c: {
+        // gen2 userpic: [0x0C, slot, 0xFF, page, len, last, 0, ck7] + data
+        assert.equal(req[2], 0xff)
+        state.userpic ??= new Array(378).fill(0)
+        state.userpic.splice(req[3] * 56, req[4], ...req.subarray(8, 8 + req[4]))
+        state.writes.push(['userpic', req[3], req[5]])
+        break
+      }
       case 0x07: state.led = [...req.subarray(1, 8)]; state.writes.push(['led']); break
       case 0x87: out[0] = 0x87; out.set(state.led, 1); break
       case 0x08: state.side = [...req.subarray(1, 8)]; state.writes.push(['side']); break
@@ -400,6 +408,51 @@ test('lighting packets match sharkfin', () => {
   // debounce: yc500 pads a zero, gen2 does not
   assert.deepEqual([...extras.debouncePacket(extras.familyOps('yc500'), 4).subarray(0, 3)], [0x11, 0, 4])
   assert.deepEqual([...extras.debouncePacket(extras.familyOps('gen2'), 4).subarray(0, 2)], [0x06, 4])
+})
+
+test('per-key colour packets match sharkfin (yc500 and gen2)', () => {
+  const blob = new Uint8Array(384).map((_, i) => i & 0xff)
+  const yc = extras.userpicPackets('yc500', blob)
+  assert.equal(yc.length, 7)
+  // [0x0C, 0, len lo, len hi, page, 0, 0, ck7] + 56 bytes at 8
+  assert.deepEqual([...yc[3].subarray(0, 7)], [0x0c, 0, 384 & 0xff, 384 >> 8, 3, 0, 0])
+  assert.deepEqual([...yc[3].subarray(8, 12)], [168, 169, 170, 171])
+  let sum = 0
+  for (let i = 0; i < 7; i++) sum += yc[3][i]
+  assert.equal(yc[3][7], 0xff - (sum & 0xff))
+  // the last yc500 page carries the remaining 48 bytes
+  assert.deepEqual([...yc[6].subarray(8 + 47, 8 + 49)], [383 & 0xff, 0])
+  const g2 = extras.userpicPackets('gen2', blob)
+  assert.equal(g2.length, 7) // 378 bytes
+  assert.deepEqual([...g2[0].subarray(0, 7)], [0x0c, 0, 0xff, 0, 56, 0, 0])
+  assert.deepEqual([...g2[6].subarray(0, 7)], [0x0c, 0, 0xff, 6, 42, 1, 0])
+  assert.equal(g2[6][8 + 41], 377 & 0xff)
+})
+
+test('per-key colours: matrix slots, written to flash, then the per-key effect', async () => {
+  const { driver, board } = await connect({ id: 2268, layout: layoutFile('Common68_ZAP68') })
+  assert.deepEqual(driver.lightingInfo().perKey, { mode: 13, readable: false, overlay: false })
+  assert.equal(driver.getPerKeyColors, undefined)
+  const n = driver.layout.keys.length
+  const colors = new Array(n).fill(null)
+  colors[0] = 0x112233
+  colors[5] = 0xff0000
+  board.state.led[2] = 2
+  await driver.setPerKeyColors(colors, true)
+  const slot = k => driver.slots[k]
+  assert.deepEqual(board.state.userpic.slice(slot(0) * 3, slot(0) * 3 + 3), [0x11, 0x22, 0x33])
+  assert.deepEqual(board.state.userpic.slice(slot(5) * 3, slot(5) * 3 + 3), [0xff, 0, 0])
+  assert.equal(board.state.userpic.filter(b => b).length, 4)
+  const pics = board.state.writes.filter(w => w[0] === 'userpic')
+  assert.equal(pics.length, 7)
+  assert.equal(pics.at(-1)[2], 1) // last page flagged
+  // then the effect: mode 13, brightness kept
+  assert.equal(board.state.led[0], 13)
+  assert.equal(board.state.led[2], 2)
+  // already on the effect: no second mode write
+  const leds = board.state.writes.filter(w => w[0] === 'led').length
+  await driver.setPerKeyColors(colors, true)
+  assert.equal(board.state.writes.filter(w => w[0] === 'led').length, leds)
 })
 
 test('macro blobs round-trip with sharkfin\'s short and long forms', () => {

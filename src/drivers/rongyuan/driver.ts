@@ -49,6 +49,9 @@ import {
   macroReadPacket,
   macroToBlob,
   macroWritePacket,
+  RY_PER_KEY_MODE,
+  RY_PER_KEY_SLOTS,
+  userpicPackets,
   parseKbOptions,
   parseLed,
   parseSide,
@@ -733,6 +736,7 @@ export class RongyuanDriver implements KeyboardDriver {
         ? { side: { effects: SIDE_EFFECTS, brightnessMax: 4, offMode: 0 } }
         : {}),
       canSwitchOff: this.ops.kbOption !== null,
+      perKey: { mode: RY_PER_KEY_MODE, readable: false, overlay: false },
       flagOrder: {
         swapped: this.flagsSwapped,
         fromRegistry: this.flagsSwapped === !!this.spec.ledFlagsSwapped
@@ -780,6 +784,52 @@ export class RongyuanDriver implements KeyboardDriver {
 
   async setBacklight(setting: LightSetting): Promise<void> {
     await this.lightWrite(ledPacket(fromSetting(setting), this.wireLed));
+  }
+
+  /**
+   * The per-key pattern, by layout key (null = off), written to flash in
+   * pages; the board cannot read it back. `show` switches the backlight to
+   * the per-key effect, keeping its brightness.
+   */
+  async setPerKeyColors(colors: ReadonlyArray<number | null>, show: boolean): Promise<void> {
+    if (this.wire.relay)
+      throw new DriverError('Plug the keyboard in by cable to write per-key colours.');
+    const blob = new Uint8Array(RY_PER_KEY_SLOTS * 3);
+    this.slots.forEach((slot, key) => {
+      const c = colors[key];
+      if (c == null || slot < 0 || slot >= RY_PER_KEY_SLOTS) return;
+      blob.set([(c >> 16) & 0xff, (c >> 8) & 0xff, c & 0xff], slot * 3);
+    });
+    await this.wire.exclusive(async () => {
+      const cooldown = this.lastFlash + FLASH_COOLDOWN_MS - this.wire.clock.now();
+      if (cooldown > 0) await this.wire.clock.sleep(cooldown);
+      // ask about the mode before the upload, not while the board writes flash
+      const led = show
+        ? parseLed(await this.wire.roundtrip(packet(LightOp.GET_LED)), this.wireLed)
+        : null;
+      for (const pkt of userpicPackets(this.spec.family === 'gen2' ? 'gen2' : 'yc500', blob)) {
+        await this.wire.send(pkt);
+        await this.wire.clock.sleep(FLASH_PAGE_GAP_MS);
+      }
+      await this.wire.clock.sleep(FLASH_SETTLE_MS);
+      if (show && led?.mode !== RY_PER_KEY_MODE) {
+        await this.wire.send(
+          ledPacket(
+            {
+              mode: RY_PER_KEY_MODE,
+              speed: 2,
+              brightness: led?.brightness ?? this.wireLed.brightnessMax,
+              option: 0,
+              rainbow: false,
+              color: [0, 200, 200]
+            },
+            this.wireLed
+          )
+        );
+      }
+      this.lastFlash = this.wire.clock.now();
+      this.stamp();
+    });
   }
 
   async setSideLight(setting: LightSetting): Promise<void> {
@@ -1525,6 +1575,7 @@ const MODE_LABELS: Record<number, string> = {
   10: 'Sine wave',
   11: 'Spring',
   12: 'Neon',
+  13: 'Per-key colours',
   14: 'Radiant',
   15: 'Loop',
   16: 'Color grid',
@@ -1557,6 +1608,7 @@ const COMMON_EFFECTS: LightEffect[] = [
   fx(10),
   fx(11, { options: ['Outward', 'Inward'] }),
   fx(12, { options: ['Right', 'Left'] }),
+  fx(RY_PER_KEY_MODE, { color: false, speedMax: null }),
   fx(14),
   fx(15, { options: ['CCW', 'CW'] }),
   fx(16),

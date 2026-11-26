@@ -9,6 +9,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Lightbulb, Palette, Power, Sparkles, Waves } from 'lucide-react';
 import RgbColorPicker from '../components/RgbColorPicker';
 import '../components/RgbSettingsPage.css';
+import type { HeroDeviceModelId } from '../keyboard/devices';
+import { PerKeyCard } from './PerKeyCard';
 import type {
   KeyboardDriver,
   LightingInfo,
@@ -35,7 +37,13 @@ const fromHex = (h: string) => parseInt(h.replace('#', ''), 16) & 0xffffff;
 /** Wait after the last change before writing (the board takes one write a second). */
 const WRITE_DELAY_MS = 350;
 
-export function LightingPage({ driver }: { driver: KeyboardDriver }) {
+export function LightingPage({
+  driver,
+  model
+}: {
+  driver: KeyboardDriver;
+  model: HeroDeviceModelId;
+}) {
   const [info, setInfo] = useState<LightingInfo | null>(() => driver.lightingInfo?.() ?? null);
   const [state, setState] = useState<LightingState | null>(null);
   const [zone, setZone] = useState<Zone>('backlight');
@@ -320,6 +328,9 @@ export function LightingPage({ driver }: { driver: KeyboardDriver }) {
           )}
         </section>
       </div>
+      {zone === 'backlight' && info.perKey && driver.setPerKeyColors && (
+        <PerKeyCard driver={driver} model={model} perKey={info.perKey} onWritten={load} />
+      )}
     </div>
   );
 }

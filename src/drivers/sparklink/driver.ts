@@ -89,6 +89,12 @@ import {
   parseLightAreas,
   parseLightBase,
   parsePalette,
+  getLightCells,
+  parseLightCells,
+  setLightCells,
+  LIGHT_CELLS_PER_CHUNK,
+  LIGHT_PAINTED,
+  LIGHT_PER_KEY_MODE,
   setLightBase,
   setPalette,
   type SlLightBase,
@@ -159,7 +165,12 @@ export class SparklinkDriver implements KeyboardDriver {
     travelMm: number,
     stepMm: number,
     /** Light areas and whether the keys have two LED rows; null without lighting. */
-    private readonly light: { areas: number[]; double: boolean } | null = null
+    private readonly light: {
+      areas: number[];
+      double: boolean;
+      /** The keys' LED grid; a key's cell is row * cols + col. */
+      grid: { rows: number; cols: number };
+    } | null = null
   ) {
     this.rateCodes = rateCodes;
     this.capabilities = {
@@ -259,12 +270,14 @@ export class SparklinkDriver implements KeyboardDriver {
     }, DEFAULT_TRAVEL_MM);
     const light = features.rgb
       ? await optional(async () => {
-          const areas = parseLightAreas(await ask(lightAreas()));
-          if (!areas.includes(0)) return null;
+          const list = parseLightAreas(await ask(lightAreas()));
+          const keys = list.find(a => a.index === 0);
+          if (!keys) return null;
+          const areas = list.map(a => a.index);
           const double = await optional(async () => (await ask(doubleLighting()))[3] === 1, false);
           // the base read must work before lighting is offered
           await ask(getLightBase(0));
-          return { areas, double };
+          return { areas, double, grid: { rows: keys.rows, cols: keys.cols } };
         }, null)
       : null;
 
@@ -618,8 +631,77 @@ export class SparklinkDriver implements KeyboardDriver {
     return {
       backlight: zone,
       ...(this.light?.areas.includes(1) ? { side: zone } : {}),
-      canSwitchOff: true
+      canSwitchOff: true,
+      ...(this.cellOf().some(c => c >= 0)
+        ? { perKey: { mode: LIGHT_PER_KEY_MODE, readable: true, overlay: true } }
+        : {})
     };
+  }
+
+  /** Each layout key's LED cell, or -1 outside the grid. */
+  private cellOf(): number[] {
+    const g = this.light?.grid;
+    if (!g || !g.rows || !g.cols) return this.positions.map(() => -1);
+    return this.positions.map(({ row, col }) =>
+      row < g.rows && col < g.cols ? row * g.cols + col : -1
+    );
+  }
+
+  private async readCells(): Promise<number[][]> {
+    const g = this.light!.grid;
+    const chunks = Math.ceil((g.rows * g.cols) / LIGHT_CELLS_PER_CHUNK);
+    const cells: number[][] = [];
+    for (let c = 0; c < chunks; c++)
+      cells.push(...parseLightCells(await this.ask(getLightCells(0, c))));
+    return cells;
+  }
+
+  async getPerKeyColors(): Promise<Array<number | null>> {
+    if (!this.light) throw new DriverError(`${this.info.name} has no lighting OpenHE can set.`);
+    const cells = await this.readCells();
+    return this.cellOf().map(i => {
+      const cell = cells[i];
+      if (!cell || cell[3] !== LIGHT_PAINTED) return null;
+      return (cell[2] << 16) | (cell[1] << 8) | cell[0];
+    });
+  }
+
+  /**
+   * The pattern is the whole state: cells not painted here lose their mark
+   * (their colour bytes are kept). Only changed chunks are written.
+   */
+  async setPerKeyColors(colors: ReadonlyArray<number | null>, show: boolean): Promise<void> {
+    if (!this.light) throw new DriverError(`${this.info.name} has no lighting OpenHE can set.`);
+    const before = await this.readCells();
+    const next = before.map(c => [c[0], c[1], c[2], 0]);
+    this.cellOf().forEach((i, key) => {
+      const c = colors[key];
+      if (i < 0 || i >= next.length || c == null) return;
+      next[i] = [c & 0xff, (c >> 8) & 0xff, (c >> 16) & 0xff, LIGHT_PAINTED];
+    });
+    let wrote = false;
+    for (let c = 0; c * LIGHT_CELLS_PER_CHUNK < next.length; c++) {
+      const lo = c * LIGHT_CELLS_PER_CHUNK;
+      const chunk = next.slice(lo, lo + LIGHT_CELLS_PER_CHUNK);
+      const was = before.slice(lo, lo + LIGHT_CELLS_PER_CHUNK);
+      // a painted cell's colour matters; an unpainted one only by its mark
+      const same = chunk.every((cell, i) =>
+        cell[3] === LIGHT_PAINTED
+          ? cell.every((b, j) => b === was[i][j])
+          : was[i][3] !== LIGHT_PAINTED
+      );
+      if (same) continue;
+      await this.ask(setLightCells(0, c, chunk));
+      wrote = true;
+    }
+    if (show) {
+      const base = parseLightBase(await this.ask(getLightBase(0)));
+      if (base.mode !== LIGHT_PER_KEY_MODE) {
+        await this.ask(setLightBase(0, { ...base, mode: LIGHT_PER_KEY_MODE }));
+        wrote = true;
+      }
+    }
+    if (wrote) await this.ask(save(Area.LIGHTING));
   }
 
   private async readLight(area: number) {

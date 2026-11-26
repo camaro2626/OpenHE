@@ -286,7 +286,7 @@ export function DriverApp({ driver }: { driver: KeyboardDriver }) {
           />
         );
       case 'lighting':
-        return <LightingPage driver={driver} />;
+        return <LightingPage driver={driver} model={model} />;
       case 'gamepad':
         return <GamepadPage {...props} model={model} />;
       default:
