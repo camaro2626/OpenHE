@@ -8,9 +8,8 @@ export const wave = (ms: number, phase: number, depth: number) =>
 
 export const le = (v: number) => [v & 0xff, (v >> 8) & 0xff];
 
-/** Name it as a demo, so nothing on screen claims a real keyboard is attached. */
+/** Every demo is called "Demo board", so nothing on screen names a real keyboard. */
 export function markDemo(driver: KeyboardDriver): KeyboardDriver {
-  const info = driver.info as { name: string };
-  if (!info.name.startsWith('Demo')) info.name = `Demo · ${info.name}`;
+  (driver.info as { name: string }).name = 'Demo board';
   return driver;
 }

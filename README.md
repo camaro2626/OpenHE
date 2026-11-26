@@ -66,7 +66,7 @@ Sparklink boards are only ever talked to when their USB id is on Sparklink's own
 
 The browser remembers the keyboard, so next time the page reconnects by itself.
 
-No keyboard to hand? **Sparklink demo** and **RongYuan demo** on the start screen open the app on a board in software (a generic 75 % Sparklink board, and RongYuan's AttackShark X65HE with its own picture), running the real drivers. Everything works, live travel included; settings last until you leave the page. They work in any browser.
+No keyboard to hand? **Sparklink demo** and **RongYuan demo** on the start screen open the app on a board in software (both called Demo board: a 75 % on Sparklink, a 68-key on RongYuan), running the real drivers. Everything works, live travel included; settings last until you leave the page. They work in any browser.
 
 On Linux the keyboard's HID node belongs to root; add a udev rule (sharkfin's [README](https://github.com/dniminenn/sharkfin#install) has one covering RongYuan vendor IDs) and replug.
 

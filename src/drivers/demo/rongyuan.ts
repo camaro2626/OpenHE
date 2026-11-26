@@ -1,7 +1,7 @@
 /**
- * RongYuan demo: AttackShark X65HE (registry id 2268) with its own 68-key
- * picture, answering sharkfin's gen2 commands in memory, with the cable
- * travel stream on WASD and space.
+ * RongYuan demo: a 68-key "Demo board" (the picture and keymap of registry
+ * entry 2268, a gen2 board), answering sharkfin's gen2 commands in memory,
+ * with the cable travel stream on WASD and space.
  */
 
 import { bundledDeps } from '../rongyuan/connect';
@@ -240,7 +240,7 @@ export async function demoRongyuan(): Promise<KeyboardDriver> {
   const driver = await RongyuanDriver.connect(
     wire,
     bundledDeps,
-    // its own ids, so nothing stored for a real X65HE on this computer is touched
+    // its own ids, so nothing stored for a real board on this computer is touched
     { vendorId: 0, productId: 0xde68, productName: 'Demo' },
     {
       streamDevices: [
