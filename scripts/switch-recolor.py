@@ -23,8 +23,6 @@ ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / 'src/assets/switches'
 
 RECIPES = {
-    # Gravastar UFO: purple stem, see-through purple top, solid purple bottom
-    'ufo': {'stem': '#9b5cf6', 'top': '#a78bfa', 'top_mix': 0.55, 'bottom': '#6d28d9', 'bottom_solid': True},
     # Skyloong Crystal Blue: turquoise stem and bottom, clear top
     'crystal-blue': {'stem': '#4fcfb6', 'top': None, 'top_mix': 0.0, 'bottom': '#5fd3bd', 'bottom_solid': True},
     # TTC KOM (sold as "Magneto" on RongYuan boards): bright red stem, clear top, deep purple base

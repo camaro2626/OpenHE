@@ -12,8 +12,9 @@ import {
   type SwitchTone
 } from '../app/switchAssets';
 import type { KeyboardDriver, SwitchCatalogEntry, SwitchSetup } from '../drivers/types';
-import ufoFront from '../assets/switches/ufo-front.webp';
-import ufoTop from '../assets/switches/ufo-top.webp';
+// Gravastar's own UFO renders, shine toned down; © Gravastar (README credits)
+import ufoFront from '../assets/switches/gravastar-ufo-front.webp';
+import ufoTop from '../assets/switches/gravastar-ufo-top.webp';
 import crystalBlueFront from '../assets/switches/crystal-blue-front.webp';
 import crystalBlueTop from '../assets/switches/crystal-blue-top.webp';
 import ttcKomFront from '../assets/switches/ttc-kom-front.webp';
@@ -28,15 +29,20 @@ const openAula = (tone: string): Pictures => ({
 /** Recolours of OpenAula's clear switch (scripts/switch-recolor.py) keep its animation. */
 const recolour = (front: string, top: string): Pictures => ({ front, top, simProfile: 'clear' });
 
+/** The Gravastar UFO's own shape, with its own press animation (switchSim). */
+const GRAVASTAR_UFO: Pictures = { front: ufoFront, top: ufoTop, simProfile: 'gravastar-ufo' };
+
 /** Pictures for OpenHE's own switches. */
 const OWN_IMAGES: Record<string, Pictures> = {
-  'gravastar-ufo': recolour(ufoFront, ufoTop),
+  'gravastar-ufo': GRAVASTAR_UFO,
   'skyloong-crystal-blue': recolour(crystalBlueFront, crystalBlueTop),
   generic: openAula('black'),
   unset: openAula('white')
 };
 /** Switches known by name (RongYuan's vendor lists). */
 const BY_NAME: Array<[RegExp, Pictures]> = [
+  // Fuling's vendor list names it "UFO Purple"
+  [/\bufo\b/i, GRAVASTAR_UFO],
   [/jade\s*(pro|gaming)/i, openAula('jade-pro')],
   // TTC KOM is sold as "Magneto"; the PRO is the white-stem, white-base one
   [/^\s*magneto\s*pro\s*$/i, openAula('white')],

@@ -83,6 +83,20 @@ export const SWITCHES: Record<string, SwitchSimSpriteConfig> = {
 };
 
 export const SWITCH_SIM_BY_PROFILE: Record<string, Omit<SwitchSimSpriteConfig, 'src'>> = {
+  // Gravastar UFO (OpenHE, src/assets/switches/gravastar-ufo-front.webp): only
+  // the round stem moves; it is cut off where it enters the curved, clear top
+  // housing, so it slides in rather than being drawn over it. No spring shows,
+  // so the spring area is empty space.
+  'gravastar-ufo': {
+    label: 'Gravastar UFO',
+    s: 1,
+    ytop: 505,
+    ylip: 505,
+    rects: [[546, 244, 988, 505]],
+    spring: [40, 1300, 100, 1360],
+    L0: 520,
+    phys: { Fpre: 30, Fbot: 45, mu: 2 }
+  },
   clear: {
     label: 'Jade',
     s: 1,

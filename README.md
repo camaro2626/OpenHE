@@ -160,6 +160,7 @@ service/, landing/, functions/, worker/
 
 - [OpenAula](https://github.com/shizunavn/OpenAula) by shizunavn: the app, interface and AULA support this project started from (Apache-2.0, see `LICENSES/Apache-2.0.txt`).
 - [sharkfin](https://github.com/dniminenn/sharkfin) by JR Lanteigne: the RongYuan protocol, board list and layouts the RongYuan driver is ported from (GPL-3.0-or-later).
+- Gravastar UFO switch pictures (`src/assets/switches/gravastar-ufo-*.webp`): Gravastar's own product renders, with the shine toned down, used only to show which switch a key has. © Gravastar; not covered by this project's license, and removed on request.
 - [libhmk](https://github.com/peppapighs/libhmk) by peppapighs: the firmware OpenHE's firmware is built on.
 - [Sparklink / 星闪悦动](https://github.com/sparklinkplayjoy/keyboard-docs): the keyboard protocol and key names the Sparklink driver is ported from (MIT, `LICENSES/MIT-sparklink.txt`).
 - [HallJoy](https://github.com/PashOK7/HallJoy) by PashOK7: the research behind the Sparklink keyboard id list and its safety rules.
