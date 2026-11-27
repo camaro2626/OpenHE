@@ -516,7 +516,7 @@
     "id": 12464,
     "name": "Wukong",
     "nameZh": "悟空轴",
-    "brand": "Other",
+    "brand": "Everglide",
     "travelUm": 3390,
     "coefficient": 20100,
     "color": "#ebebeb"
@@ -541,9 +541,9 @@
   },
   {
     "id": 12608,
-    "name": "Skyline Magnetic (3.55 mm)",
+    "name": "Skyline (3.55 mm)",
     "nameZh": "天际线轴",
-    "brand": "Other",
+    "brand": "Unionwell",
     "travelUm": 3550,
     "coefficient": 18600,
     "color": "#d3e4ff"
@@ -577,9 +577,9 @@
   },
   {
     "id": 12736,
-    "name": "Chixiao Imperial Sword",
+    "name": "Chixiao",
     "nameZh": "赤霄轴",
-    "brand": "Other",
+    "brand": "Outemu",
     "travelUm": 3540,
     "coefficient": 19900,
     "color": "#fff897"
@@ -588,7 +588,7 @@
     "id": 13088,
     "name": "Ultra-Magnetic Pro+",
     "nameZh": "极磁轴Pro+",
-    "brand": "Other",
+    "brand": "Unionwell",
     "travelUm": 3650,
     "coefficient": 17300,
     "color": "#fcc4b5"
@@ -597,52 +597,52 @@
     "id": 13104,
     "name": "Ultra-Magnetic Pro",
     "nameZh": "极磁轴Pro",
-    "brand": "Other",
+    "brand": "Unionwell",
     "travelUm": 3585,
     "coefficient": 18500,
     "color": "#fedada"
   },
   {
     "id": 13120,
-    "name": "Ultra-Magnetic RGB",
+    "name": "Ultra RGB",
     "nameZh": "极磁轴RGB",
-    "brand": "Other",
+    "brand": "Unionwell",
     "travelUm": 3580,
     "coefficient": 19000,
     "color": "#fff6f6"
   },
   {
     "id": 13136,
-    "name": "Ultra-Mag Zhuohua",
+    "name": "Zhuohua",
     "nameZh": "极磁-灼华轴",
-    "brand": "Other",
+    "brand": "Unionwell",
     "travelUm": 3645,
     "coefficient": 16950,
     "color": "#f7d8fe"
   },
   {
     "id": 13152,
-    "name": "Ultra-Mag Hunyuan",
+    "name": "Hunyuan",
     "nameZh": "极磁-混元轴",
-    "brand": "Other",
+    "brand": "Unionwell",
     "travelUm": 3655,
     "coefficient": 19200,
     "color": "#e4e4e4"
   },
   {
     "id": 13168,
-    "name": "Ultra-Mag Black Jade",
+    "name": "Dark Jade",
     "nameZh": "极磁-墨玉轴",
-    "brand": "Other",
+    "brand": "Unionwell",
     "travelUm": 3605,
     "coefficient": 18900,
     "color": "#d3f89c"
   },
   {
     "id": 13184,
-    "name": "Ultra-Mag Sakura Clear",
+    "name": "Sakura Clarity",
     "nameZh": "极磁-樱澈轴",
-    "brand": "Other",
+    "brand": "Unionwell",
     "travelUm": 3625,
     "coefficient": 22200,
     "color": "#f2b9f8"
@@ -651,34 +651,34 @@
     "id": 13264,
     "name": "Siren",
     "nameZh": "海妖轴",
-    "brand": "Other",
+    "brand": "Everglide",
     "travelUm": 3793,
     "coefficient": 17536,
     "color": "#e89ab1"
   },
   {
     "id": 13472,
-    "name": "Skyline Magnetic (3.50 mm)",
+    "name": "Skyline (3.50 mm)",
     "nameZh": "天际线轴",
-    "brand": "Other",
+    "brand": "Unionwell",
     "travelUm": 3500,
     "coefficient": 17536,
     "color": "#4dd1f9"
   },
   {
     "id": 13665,
-    "name": "Bingyao Obsidian",
+    "name": "Bingyao",
     "nameZh": "冰曜轴",
-    "brand": "Other",
+    "brand": "Unionwell",
     "travelUm": 3200,
     "coefficient": 25728,
     "color": "#54a9e1"
   },
   {
     "id": 13681,
-    "name": "Xueyao Snow Obsidian",
+    "name": "Xueyao Snow",
     "nameZh": "雪曜轴",
-    "brand": "Other",
+    "brand": "Unionwell",
     "travelUm": 3200,
     "coefficient": 25728,
     "color": "#ffffff"
@@ -687,7 +687,7 @@
     "id": 14544,
     "name": "White Wukong",
     "nameZh": "白色悟空轴",
-    "brand": "Other",
+    "brand": "Everglide",
     "travelUm": 3400,
     "coefficient": 17664,
     "color": "#ffffff"
@@ -696,7 +696,7 @@
     "id": 14608,
     "name": "Yaoguang",
     "nameZh": "瑶光轴",
-    "brand": "Other",
+    "brand": "Everglide",
     "travelUm": 3200,
     "coefficient": 18432,
     "color": "#ede8cb"

@@ -15,8 +15,6 @@ import type { KeyboardDriver, SwitchCatalogEntry, SwitchSetup } from '../drivers
 // the UFO's manufacturer renders, shine toned down (see README, Credits)
 import ufoFront from '../assets/switches/gravastar-ufo-front.webp';
 import ufoTop from '../assets/switches/gravastar-ufo-top.webp';
-import crystalBlueFront from '../assets/switches/crystal-blue-front.webp';
-import crystalBlueTop from '../assets/switches/crystal-blue-top.webp';
 // Wootility's renders (see README, Credits): a still, a top view and a
 // 41-frame press for each
 import gateronJadeFront from '../assets/switches/wooting/gateron-jade-front.webp';
@@ -55,8 +53,6 @@ const openAula = (tone: string): Pictures => ({
   ...(SWITCH_IMAGES[tone as SwitchTone] ?? {}),
   simProfile: tone
 });
-/** Recolours of OpenAula's clear switch (scripts/switch-recolor.py) keep its animation. */
-const recolour = (front: string, top: string): Pictures => ({ front, top, simProfile: 'clear' });
 
 /** A switch with a pre-rendered press (41 frames, rest to bottom-out). */
 const rendered = (front: string, top: string, side: string): Pictures => ({
@@ -79,13 +75,53 @@ const W = {
   owlabTi: rendered(owlabTiFront, owlabTiTop, owlabTiSide)
 };
 
+/**
+ * Recolours of Wootility's renders (scripts/switch-strip-recolor.py): each
+ * recipe has a press strip, a still and a top view under wooting/recolor.
+ */
+const RECOLOURED = import.meta.glob('../assets/switches/wooting/recolor/*.webp', {
+  eager: true,
+  query: '?url',
+  import: 'default'
+}) as Record<string, string>;
+const recoloured = (recipe: string): Pictures => {
+  const file = (view: string) =>
+    RECOLOURED[`../assets/switches/wooting/recolor/${recipe}-${view}.webp`];
+  return rendered(file('front'), file('top'), file('side'));
+};
+
+/** Sparklink catalog ids (axisV2Id) with a recoloured render. */
+const BY_SPARKLINK_ID: Record<number, string> = {
+  12608: 'skyline',
+  13472: 'skyline',
+  13264: 'siren',
+  12736: 'chixiao',
+  12432: 'ur-ice-magnetic',
+  12720: 'purple-star',
+  12704: 'azure-sky-pro',
+  14608: 'yaoguang',
+  13681: 'xueyao-snow',
+  13665: 'bingyao',
+  13184: 'sakura-clarity',
+  13168: 'dark-jade',
+  13152: 'hunyuan',
+  13136: 'zhuohua',
+  13120: 'ultra-rgb',
+  13104: 'ultra-magnetic-pro',
+  13088: 'ultra-magnetic-pro',
+  14544: 'wukong',
+  12464: 'wukong',
+  12512: 'pink-emperor'
+};
+
 /** The Gravastar UFO's own shape, with its own press animation (switchSim). */
 const GRAVASTAR_UFO: Pictures = { front: ufoFront, top: ufoTop, simProfile: 'gravastar-ufo' };
 
 /** Pictures for OpenHE's own switches. */
 const OWN_IMAGES: Record<string, Pictures> = {
   'gravastar-ufo': GRAVASTAR_UFO,
-  'skyloong-crystal-blue': recolour(crystalBlueFront, crystalBlueTop),
+  // Skyloong's Crystal Blue looks like Gateron's Jade Gaming
+  'skyloong-crystal-blue': W.gateronJadeGaming,
   generic: openAula('black'),
   unset: openAula('white')
 };
@@ -106,6 +142,8 @@ const BY_NAME: Array<[RegExp, Pictures]> = [
   [/^\s*(pom magneto king|(all )?pom magnet king( axis)?)\s*$/i, W.ttcKomPom],
   [/^\s*(magneto king rgb|magneto rgb)\s*$/i, W.ttcKomRgb],
   [/^\s*owlab ti\s*$/i, W.owlabTi],
+  [/^\s*crystal blue\s*$/i, W.gateronJadeGaming],
+  [/^\s*purple star\s*$/i, recoloured('purple-star')],
   // Fuling's vendor list names it "UFO Purple"
   [/\bufo\b/i, GRAVASTAR_UFO],
   // other Jade Pro / Gaming variants: OpenAula's Jade Pro
@@ -119,7 +157,10 @@ const ACCENT: Record<string, string> = {
 };
 
 function imagesFor(c: SwitchCatalogEntry): Pictures {
+  const sparklink = /^axis-(\d+)$/.exec(c.id);
+  const recipe = sparklink ? BY_SPARKLINK_ID[Number(sparklink[1])] : undefined;
   return (
+    (recipe ? recoloured(recipe) : undefined) ??
     OWN_IMAGES[c.id] ??
     BY_NAME.find(([re]) => re.test(c.name))?.[1] ??
     // anything else: the plain clear switch

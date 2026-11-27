@@ -23,8 +23,6 @@ ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / 'src/assets/switches'
 
 RECIPES = {
-    # Skyloong Crystal Blue: turquoise stem and bottom, clear top
-    'crystal-blue': {'stem': '#4fcfb6', 'top': None, 'top_mix': 0.0, 'bottom': '#5fd3bd', 'bottom_solid': True},
 }
 
 LIP = 800  # front view, px
