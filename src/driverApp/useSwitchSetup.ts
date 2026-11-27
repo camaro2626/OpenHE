@@ -12,7 +12,7 @@ import {
   type SwitchTone
 } from '../app/switchAssets';
 import type { KeyboardDriver, SwitchCatalogEntry, SwitchSetup } from '../drivers/types';
-// Gravastar's own UFO renders, shine toned down; © Gravastar (README credits)
+// the UFO's manufacturer renders, shine toned down (see README, Credits)
 import ufoFront from '../assets/switches/gravastar-ufo-front.webp';
 import ufoTop from '../assets/switches/gravastar-ufo-top.webp';
 import crystalBlueFront from '../assets/switches/crystal-blue-front.webp';
