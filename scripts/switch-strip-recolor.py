@@ -7,9 +7,8 @@
 Each base switch (src/assets/switches/wooting/<base>-side.webp, frames side by
 side) is split by geometry, not colour (the Jade family is one hue
 throughout): above the housing is stem; between the housing's top and the lip
-is the top housing, with the stem body seen through it where `stem_zones`
-says; below the lip is the bottom housing. The stem moves down by the same
-amount in every part of a frame, measured from where its top sits.
+is the top housing; below the lip is the bottom housing. The stem is one
+rigid piece drawn wherever it has got to (see BASES).
 
 A part takes a colour and a finish:
   colour  keep each pixel's lightness, swap its tint; neutral pixels (the
@@ -38,21 +37,32 @@ SRC = ROOT / 'src/assets/switches/wooting'
 OUT = SRC / 'recolor'
 FRAMES = 41
 
-# frame-0 geometry, frame pixels: housing top, lip, stem body seen inside the
-# top housing (x0, y0, x1, y1, moving with the stem); top view: the stem's
-# own outline as the base draws it (a box stem stays the base's box, a round
-# stem stays round: ('box', x0, x1, y0, y1, corner) or ('round', radius), as
-# fractions of the picture) and the rim width where the bottom housing shows
+# frame-0 geometry, frame pixels. `top` and `lip` are the top housing's top
+# and bottom edges. The stem is one rigid piece that slides down by the same
+# amount everywhere (measured from where its top sits): `stem` is its outline
+# at rest as rectangles (x0, y0, x1, y1), drawn whole in every frame wherever
+# it has got to. `pole` (a rectangle too) is the stem's middle post, behind
+# the spring; `spring` (x0, x1, y0, floor) is the spring in front of it: its
+# top rides on the stem, its floor stays. Where the spring covers the pole the
+# pole takes only a little of the colour and the spring none. A base whose stem has
+# its own colours (the KOM's red and blue) is found by colour instead
+# (`stem_hues`, degrees, inside `stem_x`). Top view: the stem's outline as the
+# base draws it (a box stem stays the base's box, a round stem stays round:
+# ('box', x0, x1, y0, y1, corner) or ('round', radius), as fractions of the
+# picture) and the rim width where the bottom housing shows.
 JADE_BOX = ('box', 0.235, 0.765, 0.32, 0.675, 0.03)
+JADE_STEM = [(81, 0, 137, 52), (55, 50, 163, 62), (47, 62, 80, 134), (140, 55, 167, 132)]
 BASES = {
-    'ttc-kom': {'top': 60, 'lip': 130, 'stem_zones': [(45, 60, 172, 128)],
+    'ttc-kom': {'top': 60, 'lip': 130, 'stem_hues': [(330, 380), (200, 250)], 'stem_x': (48, 172),
                 'top_stem': ('box', 0.23, 0.77, 0.26, 0.71, 0.02), 'rim': 0.08},
-    'gateron-jade': {'top': 56, 'lip': 131, 'stem_zones': [(48, 56, 95, 135), (135, 56, 158, 135)],
+    'gateron-jade': {'top': 56, 'lip': 131, 'stem': JADE_STEM, 'pole': (80, 62, 140, 155), 'spring': (66, 150, 62, 182),
                      'top_stem': JADE_BOX, 'rim': 0.08},
-    'gateron-jade-gaming': {'top': 57, 'lip': 131, 'stem_zones': [(48, 57, 95, 135), (135, 57, 158, 135)],
-                            'top_stem': JADE_BOX, 'rim': 0.08},
-    'gateron-jade-ultra': {'top': 58, 'lip': 130, 'stem_zones': [(55, 58, 162, 70)],
-                           'top_stem': ('round', 0.24), 'rim': 0.08},
+    'gateron-jade-gaming': {'top': 57, 'lip': 131,
+                            'stem': [(51, 0, 165, 53), (51, 50, 165, 62)] + JADE_STEM[2:],
+                            'pole': (80, 62, 140, 155), 'spring': (66, 150, 62, 182), 'top_stem': JADE_BOX, 'rim': 0.08},
+    'gateron-jade-ultra': {'top': 58, 'lip': 130,
+                           'stem': [(58, 0, 158, 66), (41, 66, 82, 131), (134, 66, 175, 131)],
+                           'pole': (82, 66, 134, 155), 'spring': (66, 150, 64, 185), 'top_stem': ('round', 0.24), 'rim': 0.08},
 }
 
 WHITE = '#ffffff'
@@ -161,37 +171,110 @@ def treat(rgb, mask, finish, colour, stem=False):
     return rgb * (1 - w) + new * w
 
 
-def masks(shape, base, d):
-    h, w = shape
+def hue(rgb):
+    mx, mn = rgb.max(-1), rgb.min(-1)
+    c = np.maximum(mx - mn, 1e-6)
+    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    h = np.where(mx == r, ((g - b) / c) % 6, np.where(mx == g, (b - r) / c + 2, (r - g) / c + 4))
+    return h * 60
+
+
+def stem_masks(rgb, a, base, d):
+    """Where the stem shows in a frame whose stem has moved down `d`, and
+    where its pole shows behind the spring."""
+    h, w = a.shape
     yy, xx = np.mgrid[0:h, 0:w]
-    # the stem above the housing: whatever of it is still above the housing top
-    above = (yy < base['top']).astype(np.float32)
-    inside = np.zeros((h, w), np.float32)
-    for x0, y0, x1, y1 in base['stem_zones']:
-        inside = np.maximum(inside, ((xx >= x0) & (xx < x1) & (yy >= y0 + d) & (yy < y1 + d)).astype(np.float32))
-    inside *= (yy >= base['top']).astype(np.float32) * (yy < base['lip']).astype(np.float32)
-    top = ((yy >= base['top']) & (yy < base['lip'])).astype(np.float32) * (1 - inside) * (1 - above)
-    bottom = (yy >= base['lip']).astype(np.float32)
-    soft = lambda m: blur(m, 0.8)
-    return soft(above), soft(inside), soft(top), soft(bottom)
+    under = np.zeros((h, w), np.float32)
+    if 'stem_hues' in base:
+        hu, sat = hue(rgb), saturation(rgb)
+        coloured = np.zeros((h, w), bool)
+        for h0, h1 in base['stem_hues']:
+            coloured |= ((hu >= h0) & (hu < h1)) | ((hu + 360 >= h0) & (hu + 360 < h1))
+        x0, x1 = base['stem_x']
+        stem = coloured * np.clip((sat - 0.1) / 0.12, 0, 1) * ((xx >= x0) & (xx < x1))
+    else:
+        outline = np.zeros((h, w), bool)
+        for x0, y0, x1, y1 in base['stem']:
+            outline |= (xx >= x0) & (xx < x1) & (yy >= y0 + d) & (yy < y1 + d)
+        x0, y0, x1, y1 = base['pole']
+        pole = (xx >= x0) & (xx < x1) & (yy >= y0 + d) & (yy < y1 + d)
+        sx0, sx1, sy0, floor = base['spring']
+        spring = (xx >= sx0) & (xx < sx1) & (yy >= sy0 + d) & (yy < floor)
+        stem = (outline | (pole & ~spring)).astype(np.float32)
+        under = (pole & spring & ~outline).astype(np.float32)
+    shown = (a > 0.3).astype(np.float32)
+    return blur(stem * shown, 0.6), blur(under * shown, 0.6)
+
+
+def stem_colour(rgb, mask, colour, groups=None):
+    """The stem in `colour`, shaded by its own light and dark. `groups` (masks)
+    are parts of the base stem in different colours, each centred on its own
+    average so the new stem comes out one colour."""
+    lum = rgb @ LUMA
+    rel = np.zeros_like(lum)
+    for g in groups or [np.ones_like(lum)]:
+        gm = mask * g
+        m = float((lum * gm).sum() / max(gm.sum(), 1e-6))
+        rel = np.where(g > 0.5, lum - m, rel)
+    c = hex_rgb(colour)
+    if float(c @ LUMA) < 0.3:
+        new = np.clip(c + 0.35 * rel[..., None], 0, 1)
+    else:
+        new = colorize(np.clip(0.5 + 0.65 * rel, 0, 1), colour)
+    m3 = mask[..., None]
+    return rgb * (1 - m3) + new * m3
+
+
+def spring_metal(rgb, base, d):
+    """The spring's coils: striped (strong local contrast) inside the spring."""
+    h, w = rgb.shape[:2]
+    if 'spring' not in base:
+        return np.zeros((h, w), np.float32)
+    yy, xx = np.mgrid[0:h, 0:w]
+    sx0, sx1, sy0, floor = base['spring']
+    band = ((xx >= sx0 - 4) & (xx < sx1 + 4) & (yy >= sy0 + d) & (yy < floor + 4)).astype(np.float32)
+    lum = rgb @ LUMA
+    mean = blur(lum, 1.5)
+    spread = np.sqrt(np.clip(blur(lum * lum, 1.5) - mean * mean, 0, None))
+    return blur(blur(band, 1) * np.clip((spread - 0.02) / 0.06, 0, 1), 1.5)
+
+
+# how much of a top housing's finish lies over the stem seen through it
+THROUGH = {'clear': 0.4, 'cloudy': 0.5, 'opaque': 1.0}
+GLASS = 0.2  # a plain clear top: the stem behind it a touch lighter, as rendered
 
 
 def recolor_frame(frame, base, d, recipe):
     rgb, a = frame[..., :3], frame[..., 3]
     _, stem, top, bottom = recipe
-    above, inside, top_m, bottom_m = masks(a.shape, base, d)
-    out = treat(rgb, above, *stem, stem=True)
-    if top[0] == 'opaque':
-        # nothing shows through an opaque top: the stem inside is housing
-        top_m = np.maximum(top_m, inside)
-    else:
-        out = treat(out, inside, *stem, stem=True)
+    h, w = a.shape
+    yy = np.mgrid[0:h, 0:w][0]
+    stem_m, under = stem_masks(rgb, a, base, d)
+    groups = None
+    if 'stem_hues' in base:
+        hu = hue(rgb)
+        groups = [(((hu >= h0) & (hu < h1)) | ((hu + 360 >= h0) & (hu + 360 < h1))).astype(np.float32)
+                  for h0, h1 in base['stem_hues']]
+    metal = spring_metal(rgb, base, d)
+    out = stem_colour(rgb, stem_m, stem[1], groups)
+    out = stem_colour(out, under * 0.45 * (1 - metal), stem[1])
+    top_band = blur(((yy >= base['top']) & (yy < base['lip'])).astype(np.float32), 0.8)
+    bottom_band = blur((yy >= base['lip']).astype(np.float32), 0.8)
+    top_m = top_band * (1 - stem_m)
     out = treat(out, top_m, *top)
+    # the stem seen through the top housing
+    k = GLASS if top == ('clear', None) else THROUGH[top[0]]
+    out = treat(out, top_band * stem_m * k, *top)
+    bottom_m = bottom_band * (1 - stem_m) * (1 - metal)
     out = treat(out, bottom_m, *bottom_finish(bottom))
     alpha = a
     if top[0] == 'opaque':
         # an opaque top is drawn solid (as Wootility's KOM POM)
-        alpha = np.where(a > 0.35, a * (1 - top_m) + top_m, a)
+        alpha = np.where(a > 0.35, a * (1 - top_band) + top_band, a)
+    # the spring is plain metal, whatever is around it
+    grey = (np.clip(out, 0, 1) @ LUMA)[..., None]
+    keep = (metal * (1 - top_band * (top[0] == 'opaque')))[..., None]
+    out = out * (1 - keep) + grey * keep
     return np.dstack([np.clip(out, 0, 1), alpha])
 
 
