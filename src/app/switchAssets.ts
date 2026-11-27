@@ -45,6 +45,11 @@ type SwitchOption = {
   top?: string;
   /** Press-animation measurements to use (a SWITCH_SIM_BY_PROFILE key) when `id` has none. */
   simProfile?: string;
+  /**
+   * A pre-rendered press: `count` equal frames side by side, from rest to the
+   * bottom of the travel. Played by depth instead of the cut-and-slide sim.
+   */
+  sideFrames?: { src: string; count: number };
 };
 
 const SWITCH_IMAGES: Partial<Record<SwitchTone, { front: string; top: string }>> = {

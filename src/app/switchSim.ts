@@ -769,6 +769,54 @@ export class SwitchView {
   }
 }
 
+/** What the preview draws with: a sliced sprite (SwitchView) or a frame strip. */
+export interface SwitchDrawer {
+  draw(xmm: number, ripple?: number): void;
+  dispose(): void;
+}
+
+/**
+ * A pre-rendered press (frames side by side, rest to bottom-out): the frame
+ * for the current depth, so springs and housings move as rendered.
+ */
+export class FrameStripView implements SwitchDrawer {
+  private readonly fw: number;
+  private readonly fh: number;
+  private last = -1;
+
+  constructor(
+    private img: HTMLImageElement | null,
+    private readonly count: number,
+    private readonly travelMm: number,
+    private readonly cv: HTMLCanvasElement
+  ) {
+    const w = img?.naturalWidth || img?.width || 0;
+    this.fw = Math.floor(w / Math.max(1, count));
+    this.fh = img?.naturalHeight || img?.height || 0;
+    cv.width = this.fw;
+    cv.height = this.fh;
+  }
+
+  draw(xmm: number, ripple = 0): void {
+    if (!this.img || !this.fw) return;
+    const t = Math.min(1, Math.max(0, (xmm - ripple) / this.travelMm));
+    const i = Math.round(t * (this.count - 1));
+    if (i === this.last) return;
+    this.last = i;
+    const ctx = this.cv.getContext('2d');
+    if (!ctx) return;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, this.fw, this.fh);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(this.img, i * this.fw, 0, this.fw, this.fh, 0, 0, this.fw, this.fh);
+  }
+
+  dispose(): void {
+    this.img = null;
+  }
+}
+
 export function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((res, rej) => {
     const i = new Image();

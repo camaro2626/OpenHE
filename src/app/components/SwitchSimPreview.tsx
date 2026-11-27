@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../../i18n';
 import type { SwitchOption } from '../switchAssets';
-import { TRAVEL, SwitchSim, SwitchView, loadImage, resolveSwitchSimConfig } from '../switchSim';
+import {
+  FrameStripView,
+  TRAVEL,
+  SwitchSim,
+  SwitchView,
+  loadImage,
+  resolveSwitchSimConfig,
+  type SwitchDrawer
+} from '../switchSim';
 import { SwitchStemMenuIcon } from './SwitchStemMenuIcon';
 
 export interface SwitchSimPreviewProps {
@@ -40,7 +48,7 @@ export function SwitchSimPreview({
   const { tr } = useI18n();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const simRef = useRef<SwitchSim | null>(null);
-  const viewRef = useRef<SwitchView | null>(null);
+  const viewRef = useRef<SwitchDrawer | null>(null);
 
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -75,11 +83,14 @@ export function SwitchSimPreview({
     setReady(false);
     setFailed(false);
 
-    loadImage(selectedSwitch.front)
+    const strip = selectedSwitch.sideFrames;
+    loadImage(strip?.src ?? selectedSwitch.front)
       .then(img => {
         if (cancelled || !canvasRef.current) return;
         const cfg = resolveSwitchSimConfig(selectedSwitch, img.naturalWidth);
-        const view = new SwitchView(img, cfg, canvasRef.current);
+        const view: SwitchDrawer = strip
+          ? new FrameStripView(img, strip.count, targetRef.current.maxTravel, canvasRef.current)
+          : new SwitchView(img, cfg, canvasRef.current);
         const sim = new SwitchSim({
           ...cfg.phys,
           T: selectedSwitch.travelMm ?? TRAVEL
@@ -132,7 +143,12 @@ export function SwitchSimPreview({
       viewRef.current = null;
       simRef.current = null;
     };
-  }, [selectedSwitch.id, selectedSwitch.front, selectedSwitch.travelMm]);
+  }, [
+    selectedSwitch.id,
+    selectedSwitch.front,
+    selectedSwitch.sideFrames?.src,
+    selectedSwitch.travelMm
+  ]);
 
   const isMixedVisual = switchProfileMixed || (hasSelection && actuationMixed);
 

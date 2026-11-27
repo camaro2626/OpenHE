@@ -17,17 +17,67 @@ import ufoFront from '../assets/switches/gravastar-ufo-front.webp';
 import ufoTop from '../assets/switches/gravastar-ufo-top.webp';
 import crystalBlueFront from '../assets/switches/crystal-blue-front.webp';
 import crystalBlueTop from '../assets/switches/crystal-blue-top.webp';
-import ttcKomFront from '../assets/switches/ttc-kom-front.webp';
-import ttcKomTop from '../assets/switches/ttc-kom-top.webp';
+// Wootility's renders (see README, Credits): a still, a top view and a
+// 41-frame press for each
+import gateronJadeFront from '../assets/switches/wooting/gateron-jade-front.webp';
+import gateronJadeTop from '../assets/switches/wooting/gateron-jade-top.webp';
+import gateronJadeSide from '../assets/switches/wooting/gateron-jade-side.webp';
+import gateronJadeProFront from '../assets/switches/wooting/gateron-jade-pro-front.webp';
+import gateronJadeProTop from '../assets/switches/wooting/gateron-jade-pro-top.webp';
+import gateronJadeProSide from '../assets/switches/wooting/gateron-jade-pro-side.webp';
+import gateronJadeGamingFront from '../assets/switches/wooting/gateron-jade-gaming-front.webp';
+import gateronJadeGamingTop from '../assets/switches/wooting/gateron-jade-gaming-top.webp';
+import gateronJadeGamingSide from '../assets/switches/wooting/gateron-jade-gaming-side.webp';
+import gateronJadeEmeraldFront from '../assets/switches/wooting/gateron-jade-emerald-front.webp';
+import gateronJadeEmeraldTop from '../assets/switches/wooting/gateron-jade-emerald-top.webp';
+import gateronJadeEmeraldSide from '../assets/switches/wooting/gateron-jade-emerald-side.webp';
+import ttcKomFront from '../assets/switches/wooting/ttc-kom-front.webp';
+import ttcKomTop from '../assets/switches/wooting/ttc-kom-top.webp';
+import ttcKomSide from '../assets/switches/wooting/ttc-kom-side.webp';
+import ttcKomPomFront from '../assets/switches/wooting/ttc-kom-pom-front.webp';
+import ttcKomPomTop from '../assets/switches/wooting/ttc-kom-pom-top.webp';
+import ttcKomPomSide from '../assets/switches/wooting/ttc-kom-pom-side.webp';
+import ttcKomRgbFront from '../assets/switches/wooting/ttc-kom-rgb-front.webp';
+import ttcKomRgbTop from '../assets/switches/wooting/ttc-kom-rgb-top.webp';
+import ttcKomRgbSide from '../assets/switches/wooting/ttc-kom-rgb-side.webp';
+import owlabTiFront from '../assets/switches/wooting/owlab-ti-front.webp';
+import owlabTiTop from '../assets/switches/wooting/owlab-ti-top.webp';
+import owlabTiSide from '../assets/switches/wooting/owlab-ti-side.webp';
 import type { HeroDeviceModelId } from '../keyboard/devices';
 
-type Pictures = { front?: string; top?: string; simProfile?: string };
+type Pictures = {
+  front?: string;
+  top?: string;
+  simProfile?: string;
+  sideFrames?: { src: string; count: number };
+};
 const openAula = (tone: string): Pictures => ({
   ...(SWITCH_IMAGES[tone as SwitchTone] ?? {}),
   simProfile: tone
 });
 /** Recolours of OpenAula's clear switch (scripts/switch-recolor.py) keep its animation. */
 const recolour = (front: string, top: string): Pictures => ({ front, top, simProfile: 'clear' });
+
+/** A switch with a pre-rendered press (41 frames, rest to bottom-out). */
+const rendered = (front: string, top: string, side: string): Pictures => ({
+  front,
+  top,
+  sideFrames: { src: side, count: 41 }
+});
+const W = {
+  gateronJade: rendered(gateronJadeFront, gateronJadeTop, gateronJadeSide),
+  gateronJadePro: rendered(gateronJadeProFront, gateronJadeProTop, gateronJadeProSide),
+  gateronJadeGaming: rendered(gateronJadeGamingFront, gateronJadeGamingTop, gateronJadeGamingSide),
+  gateronJadeEmerald: rendered(
+    gateronJadeEmeraldFront,
+    gateronJadeEmeraldTop,
+    gateronJadeEmeraldSide
+  ),
+  ttcKom: rendered(ttcKomFront, ttcKomTop, ttcKomSide),
+  ttcKomPom: rendered(ttcKomPomFront, ttcKomPomTop, ttcKomPomSide),
+  ttcKomRgb: rendered(ttcKomRgbFront, ttcKomRgbTop, ttcKomRgbSide),
+  owlabTi: rendered(owlabTiFront, owlabTiTop, owlabTiSide)
+};
 
 /** The Gravastar UFO's own shape, with its own press animation (switchSim). */
 const GRAVASTAR_UFO: Pictures = { front: ufoFront, top: ufoTop, simProfile: 'gravastar-ufo' };
@@ -39,16 +89,27 @@ const OWN_IMAGES: Record<string, Pictures> = {
   generic: openAula('black'),
   unset: openAula('white')
 };
-/** Switches known by name (RongYuan's vendor lists). */
+/**
+ * Switches known by name: RongYuan's vendor lists and Sparklink's catalog
+ * (English names from it). Exact names first; the first match wins.
+ */
 const BY_NAME: Array<[RegExp, Pictures]> = [
+  // Gateron's Jade family
+  [/^\s*magnetic jade\s*$/i, W.gateronJade],
+  [/^\s*magnetic jade pro\s*$/i, W.gateronJadePro],
+  [/^\s*magnetic jade gaming\s*$/i, W.gateronJadeGaming],
+  [/^\s*emerald jade\s*$/i, W.gateronJadeEmerald],
+  // TTC KOM (万磁王): sold as "Magneto" on RongYuan boards; the PRO is the
+  // white-stem, white-base one and keeps its recolour
+  [/^\s*magneto\s*pro\s*$/i, openAula('white')],
+  [/^\s*(magneto|magneto king|ttc magnet king)\s*$/i, W.ttcKom],
+  [/^\s*(pom magneto king|(all )?pom magnet king( axis)?)\s*$/i, W.ttcKomPom],
+  [/^\s*(magneto king rgb|magneto rgb)\s*$/i, W.ttcKomRgb],
+  [/^\s*owlab ti\s*$/i, W.owlabTi],
   // Fuling's vendor list names it "UFO Purple"
   [/\bufo\b/i, GRAVASTAR_UFO],
-  [/jade\s*(pro|gaming)/i, openAula('jade-pro')],
-  // TTC KOM is sold as "Magneto"; the PRO is the white-stem, white-base one
-  [/^\s*magneto\s*pro\s*$/i, openAula('white')],
-  [/^\s*magneto\s*$/i, recolour(ttcKomFront, ttcKomTop)],
-  // Sparklink's catalog: TTC's 万磁王 is the KOM
-  [/^\s*magneto king\s*$/i, recolour(ttcKomFront, ttcKomTop)]
+  // other Jade Pro / Gaming variants: OpenAula's Jade Pro
+  [/jade\s*(pro|gaming)/i, openAula('jade-pro')]
 ];
 const ACCENT: Record<string, string> = {
   generic: '#5b6268',

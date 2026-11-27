@@ -25,8 +25,6 @@ SRC = ROOT / 'src/assets/switches'
 RECIPES = {
     # Skyloong Crystal Blue: turquoise stem and bottom, clear top
     'crystal-blue': {'stem': '#4fcfb6', 'top': None, 'top_mix': 0.0, 'bottom': '#5fd3bd', 'bottom_solid': True},
-    # TTC KOM (sold as "Magneto" on RongYuan boards): bright red stem, clear top, deep purple base
-    'ttc-kom': {'stem': '#e0222c', 'stem_gain': 0.66, 'top': None, 'top_mix': 0.0, 'bottom': '#5a1f78', 'bottom_gain': 0.62, 'bottom_solid': True},
 }
 
 LIP = 800  # front view, px
