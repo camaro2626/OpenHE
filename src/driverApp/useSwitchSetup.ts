@@ -111,7 +111,30 @@ const BY_SPARKLINK_ID: Record<number, string> = {
   13088: 'ultra-magnetic-pro',
   14544: 'wukong',
   12464: 'wukong',
-  12512: 'pink-emperor'
+  12512: 'pink-emperor',
+  4176: 'yujingzi',
+  4560: 'pink-jade',
+  4544: 'pink-jade',
+  4368: 'pink-jade',
+  4528: 'genty-silent',
+  4432: 'dual-rail-orange',
+  4416: 'dual-rail-white',
+  4400: 'xuanwu',
+  8464: 'elf-king',
+  4256: 'spark',
+  4192: 'green-dragon',
+  4272: 'purple-dragon',
+  4288: 'red-dragon',
+  4208: 'apollo',
+  8400: 'soldier-king',
+  8416: 'soldier-king-pro',
+  8432: 'lingxue',
+  8448: 'dragon-lord',
+  8480: 'taie-sword',
+  8288: 'love-magneto',
+  8304: 'purple-heart-magneto',
+  8320: 'sacred-heart-magneto',
+  8336: 'sun-god'
 };
 
 /** The Gravastar UFO's own shape, with its own press animation (switchSim). */
@@ -134,7 +157,7 @@ const BY_NAME: Array<[RegExp, Pictures]> = [
   [/^\s*magnetic jade\s*$/i, W.gateronJade],
   [/^\s*magnetic jade pro\s*$/i, W.gateronJadePro],
   [/^\s*magnetic jade gaming\s*$/i, W.gateronJadeGaming],
-  [/^\s*emerald jade\s*$/i, W.gateronJadeEmerald],
+  [/^\s*(jade emerald|emerald jade)\s*$/i, W.gateronJadeEmerald],
   // TTC KOM (万磁王): sold as "Magneto" on RongYuan boards; the PRO is the
   // white-stem, white-base one and keeps its recolour
   [/^\s*magneto\s*pro\s*$/i, openAula('white')],

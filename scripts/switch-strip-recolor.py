@@ -14,6 +14,8 @@ A part takes a colour and a finish:
   colour  keep each pixel's lightness, swap its tint; neutral pixels (the
           metal spring, clear glass) barely move
   clear   drop the tint and lighten (optionally a light tint)
+  translucent  see-through, strongly tinted
+  keep    as the base has it
   cloudy  milky over the inside: the inside shows, softened
   opaque  a top housing: the whole part in the colour, solid; a bottom
           housing: its walls in the colour with the inside still shown,
@@ -63,6 +65,13 @@ BASES = {
     'gateron-jade-ultra': {'top': 58, 'lip': 130,
                            'stem': [(58, 0, 158, 66), (41, 66, 82, 131), (134, 66, 175, 131)],
                            'pole': (82, 66, 134, 155), 'spring': (66, 150, 64, 185), 'top_stem': ('round', 0.24), 'rim': 0.08},
+    # clear housings, the KOM's red and blue stem
+    'ttc-kom-rgb': {'top': 60, 'lip': 128, 'stem_hues': [(330, 380), (200, 250)], 'stem_x': (48, 172),
+                    'top_stem': ('box', 0.22, 0.78, 0.26, 0.74, 0.02), 'rim': 0.08},
+    # opaque housings: the stem shows above the top and in the cut-away bottom
+    'ttc-kom-pom': {'top': 60, 'lip': 130, 'stem': [(53, 0, 165, 62), (53, 62, 167, 117)],
+                    'pole': (84, 117, 137, 155), 'spring': (70, 150, 117, 185),
+                    'top_stem': ('box', 0.23, 0.77, 0.27, 0.72, 0.02), 'rim': 0.08},
 }
 
 WHITE = '#ffffff'
@@ -93,6 +102,32 @@ RECIPES = {
     # TTC KOM
     'wukong': ('ttc-kom', ('colour', WHITE), ('clear', None), ('clear', None)),
     'pink-emperor': ('ttc-kom', ('colour', '#ffe58a'), ('clear', '#ffd6ec'), ('opaque', WHITE)),
+    # second batch. Jade (Jade Pro is the same switch)
+    'yujingzi': ('gateron-jade', ('colour', '#d42a2a'), ('translucent', '#d42a2a'), ('opaque', '#c81e24')),
+    'pink-jade': ('gateron-jade', ('colour', '#ff8fbf'), ('clear', None), ('opaque', '#ffc6dd')),
+    'genty-silent': ('gateron-jade', ('colour', '#8ff0e6'), ('clear', None), ('opaque', '#b9a3e8')),
+    'dual-rail-orange': ('gateron-jade', ('colour', '#ff8a1c'), ('clear', None), ('opaque', WHITE)),
+    'dual-rail-white': ('gateron-jade', ('colour', WHITE), ('clear', None), ('opaque', WHITE)),
+    'xuanwu': ('gateron-jade', ('colour', '#e6d9ff'), ('translucent', '#4e2a86'), ('opaque', '#7d4fc4')),
+    'elf-king': ('gateron-jade', ('colour', '#8ff0e6'), ('clear', None), ('opaque', WHITE)),
+    # Jade Gaming
+    'green-dragon': ('gateron-jade-gaming', ('colour', '#9ae03c'), ('clear', None), ('opaque', '#9ae03c')),
+    'purple-dragon': ('gateron-jade-gaming', ('colour', '#9b80e0'), ('clear', None), ('opaque', '#9b80e0')),
+    'red-dragon': ('gateron-jade-gaming', ('colour', '#9e1b1b'), ('clear', None), ('opaque', '#9e1b1b')),
+    'apollo': ('gateron-jade-gaming', ('colour', '#ffe135'), ('clear', None), ('opaque', '#1d2a5c')),
+    'soldier-king': ('gateron-jade-gaming', ('colour', '#a0703c'), ('translucent', '#c3b091'), ('opaque', '#5b6b2e')),
+    'soldier-king-pro': ('gateron-jade-gaming', ('colour', '#c3b091'), ('clear', None), ('opaque', '#c3b091')),
+    'lingxue': ('gateron-jade-gaming', ('colour', '#a6d8ff'), ('clear', None), ('opaque', WHITE)),
+    'dragon-lord': ('gateron-jade-gaming', ('colour', '#b99af0'), ('translucent', '#8a4fd8'), ('opaque', '#d6c47a')),
+    'taie-sword': ('gateron-jade-gaming', ('colour', '#ff9a2e'), ('clear', None), ('opaque', WHITE)),
+    # Jade Ultra
+    'spark': ('gateron-jade-ultra', ('colour', '#ff8a1c'), ('translucent', '#ff8a1c'), ('opaque', '#1b1c1f')),
+    # TTC KOM RGB (Magneto King RGB): clear housings stay clear
+    'love-magneto': ('ttc-kom-rgb', ('colour', '#ffb3cf'), ('keep', None), ('keep', None)),
+    'purple-heart-magneto': ('ttc-kom-rgb', ('colour', '#5a1fb5'), ('keep', None), ('keep', None)),
+    'sacred-heart-magneto': ('ttc-kom-rgb', ('colour', WHITE), ('keep', None), ('keep', None)),
+    # TTC KOM POM (POM Magneto King): all opaque
+    'sun-god': ('ttc-kom-pom', ('colour', '#ff8a1c'), ('opaque', '#1b1c1f'), ('opaque', '#ff7a00')),
 }
 
 LUMA = np.array([0.299, 0.587, 0.114], np.float32)
@@ -148,6 +183,13 @@ def treat(rgb, mask, finish, colour, stem=False):
             new = np.clip(c + 0.45 * (lum - m)[..., None], 0, 1)
         else:
             new = colorize(np.clip(0.5 + 0.9 * (lum - m), 0, 1), colour)
+    elif finish == 'keep':
+        weight = np.zeros_like(lum)
+        new = rgb
+    elif finish == 'translucent':
+        # a strongly tinted see-through housing
+        weight = np.ones_like(lum)
+        new = 0.35 * (0.3 + 0.7 * grey) + 0.65 * colorize(0.2 + 0.75 * lum, colour)
     elif finish == 'clear':
         weight = np.ones_like(lum)
         clear = 0.3 + 0.7 * grey
@@ -240,7 +282,7 @@ def spring_metal(rgb, base, d):
 
 
 # how much of a top housing's finish lies over the stem seen through it
-THROUGH = {'clear': 0.4, 'cloudy': 0.5, 'opaque': 1.0}
+THROUGH = {'clear': 0.4, 'translucent': 0.6, 'cloudy': 0.5, 'opaque': 1.0, 'keep': 0.0}
 GLASS = 0.2  # a plain clear top: the stem behind it a touch lighter, as rendered
 
 

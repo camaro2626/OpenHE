@@ -34,3 +34,4 @@ hub-aulacn/
 
 # Wrangler build cache and Pages temp files
 .wrangler/
+__pycache__/

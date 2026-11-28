@@ -37,7 +37,7 @@
   },
   {
     "id": 4176,
-    "name": "Jade King (Yujingzi)",
+    "name": "Yujingzi",
     "nameZh": "玉京子轴",
     "brand": "Gateron",
     "travelUm": 3420,
@@ -55,7 +55,7 @@
   },
   {
     "id": 4208,
-    "name": "Apollo Ultra-Short",
+    "name": "Apollo",
     "nameZh": "阿波罗轴",
     "brand": "Gateron",
     "travelUm": 3130,
@@ -82,7 +82,7 @@
   },
   {
     "id": 4256,
-    "name": "Hanabi / Fireworks",
+    "name": "Spark",
     "nameZh": "花火轴",
     "brand": "Gateron",
     "travelUm": 3150,
@@ -100,7 +100,7 @@
   },
   {
     "id": 4288,
-    "name": "Red Dragon (Lubed)",
+    "name": "Red Dragon",
     "nameZh": "赤龙轴(自润)",
     "brand": "Gateron",
     "travelUm": 3380,
@@ -145,7 +145,7 @@
   },
   {
     "id": 4368,
-    "name": "Sakura Pink",
+    "name": "Jade Sakura",
     "nameZh": "樱花轴",
     "brand": "Gateron",
     "travelUm": 3390,
@@ -163,7 +163,7 @@
   },
   {
     "id": 4400,
-    "name": "Xuanwu (Fully Lubed)",
+    "name": "Xuanwu",
     "nameZh": "玄武轴(全润)",
     "brand": "Gateron",
     "travelUm": 3365,
@@ -226,7 +226,7 @@
   },
   {
     "id": 4528,
-    "name": "Silent Zen (Wujing)",
+    "name": "Genty Silent",
     "nameZh": "悟静轴",
     "brand": "Gateron",
     "travelUm": 3615,
@@ -253,7 +253,7 @@
   },
   {
     "id": 4592,
-    "name": "Emerald Jade",
+    "name": "Jade Emerald",
     "nameZh": "翠玉轴",
     "brand": "Gateron",
     "travelUm": 3355,
@@ -316,7 +316,7 @@
   },
   {
     "id": 8288,
-    "name": "Sweetheart Magneto",
+    "name": "Love Magneto",
     "nameZh": "爱心万磁王",
     "brand": "TTC",
     "travelUm": 3390,
@@ -343,7 +343,7 @@
   },
   {
     "id": 8336,
-    "name": "Sun God / Apollo",
+    "name": "Sun God",
     "nameZh": "太阳神轴",
     "brand": "TTC",
     "travelUm": 3420,
@@ -397,7 +397,7 @@
   },
   {
     "id": 8432,
-    "name": "Ice Snow (Lingxue)",
+    "name": "Lingxue",
     "nameZh": "凌雪轴",
     "brand": "TTC",
     "travelUm": 3510,
@@ -406,7 +406,7 @@
   },
   {
     "id": 8448,
-    "name": "Dragon God",
+    "name": "Dragon Lord",
     "nameZh": "龙神轴",
     "brand": "TTC",
     "travelUm": 3470,
@@ -424,7 +424,7 @@
   },
   {
     "id": 8480,
-    "name": "Tai-A Sword",
+    "name": "Taie Sword",
     "nameZh": "太阿磁轴",
     "brand": "TTC",
     "travelUm": 3470,
