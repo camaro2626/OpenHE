@@ -20,7 +20,12 @@ const pick = (selected: Set<string>, byKey: Record<string, number>, fallback: nu
   return first !== undefined ? (byKey[first] ?? fallback) : fallback;
 };
 
-export function useOpenAulaPerformance(model: HeroDeviceModelId, state: ActuationDraft) {
+export function useOpenAulaPerformance(
+  model: HeroDeviceModelId,
+  state: ActuationDraft,
+  /** The board's smallest step: labels show it when finer than 0.005 mm. */
+  stepMm = 0.005
+) {
   const { draft, setDraft } = state;
   const keyIds = useMemo(() => heroLayout(model).keyIds, [model]);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
@@ -51,11 +56,11 @@ export function useOpenAulaPerformance(model: HeroDeviceModelId, state: Actuatio
   const rapidPreviewByKey = useMemo(
     () =>
       map(a => ({
-        primary: formatMillimeters(a.rtPressMm),
-        secondary: a.splitSensitivity ? formatMillimeters(a.rtReleaseMm) : undefined,
+        primary: formatMillimeters(a.rtPressMm, 2, stepMm),
+        secondary: a.splitSensitivity ? formatMillimeters(a.rtReleaseMm, 2, stepMm) : undefined,
         active: a.rapidTrigger
       })),
-    [map]
+    [map, stepMm]
   );
   const deadzonePreviewByKey = useMemo(
     () =>

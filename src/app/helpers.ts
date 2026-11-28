@@ -111,17 +111,25 @@ export function clampRapidTriggerForModel(
 
 export const RAPID_TRIGGER_VALUES = RAPID_TRIGGER_VALUES_STANDARD;
 
+let displayStepMm = 0.005;
+/** The connected board's smallest step, for labels that are not given one (key caps). */
+export function setDisplayStepMm(stepMm: number) {
+  displayStepMm = stepMm > 0 ? stepMm : 0.005;
+}
+
 /**
  * Formats millimeter distances with 2 decimal places for multiples of `0.01 mm`
  * (`0.10`, `1.60`) and 3 decimal places for `0.005 mm` steps (`0.005`, `0.125`),
  * rounding arbitrary thousandths (`0.164` -> `0.165`, `0.172` -> `0.17`, `0.173` -> `0.175`)
- * to the nearest `5 µm` (`0.005 mm`) step.
+ * to the nearest `5 µm` (`0.005 mm`) step. A board with a finer step (`stepMm`, e.g.
+ * `0.001`) is shown to that step instead.
  */
-export function formatMillimeters(value: number, minDecimals = 2): string {
+export function formatMillimeters(value: number, minDecimals = 2, stepMm = displayStepMm): string {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     return (0).toFixed(minDecimals);
   }
-  const roundedUm = Math.round((value * 1000) / 5) * 5;
+  const unitUm = stepMm < 0.005 ? Math.max(1, Math.round(stepMm * 1000)) : 5;
+  const roundedUm = Math.round((value * 1000) / unitUm) * unitUm;
   if (roundedUm % 10 !== 0) {
     return (roundedUm / 1000).toFixed(3);
   }

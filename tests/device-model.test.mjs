@@ -334,3 +334,9 @@ test('formatMillimeters and rapidTriggerValuesForModel round HERO 68 XS to 0.005
     assert.equal(helpers.clampRapidTriggerForModel(0.155, nonXsModel), 0.16)
   }
 })
+
+test('formatMillimeters shows a finer board step (0.001 mm) as it is', () => {
+  assert.equal(helpers.formatMillimeters(0.123, 2, 0.001), '0.123')
+  assert.equal(helpers.formatMillimeters(0.12, 2, 0.001), '0.12')
+  assert.equal(helpers.formatMillimeters(0.123), '0.125')
+})

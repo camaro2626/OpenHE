@@ -93,18 +93,18 @@ function RangeControl({
           100
         : ((recommendedValue - minAllowed) / (maxAllowed - minAllowed)) * 100;
   const [draftValue, setDraftValue] = useState(() =>
-    mixed ? '' : formatMillimeters(effectiveValue)
+    mixed ? '' : formatMillimeters(effectiveValue, 2, stepAllowed)
   );
 
   useEffect(() => {
-    setDraftValue(mixed ? '' : formatMillimeters(effectiveValue));
-  }, [effectiveValue, mixed]);
+    setDraftValue(mixed ? '' : formatMillimeters(effectiveValue, 2, stepAllowed));
+  }, [effectiveValue, mixed, stepAllowed]);
 
   const commitNumberInput = () => {
     const normalized = draftValue.trim().replace(',', '.');
     const parsed = Number(normalized);
     if (!normalized || Number.isNaN(parsed)) {
-      setDraftValue(mixed ? '' : formatMillimeters(effectiveValue));
+      setDraftValue(mixed ? '' : formatMillimeters(effectiveValue, 2, stepAllowed));
       return;
     }
     const committed =
@@ -119,12 +119,12 @@ function RangeControl({
           )
         : snapToStep(parsed, min, max, step);
     onChange(committed);
-    setDraftValue(formatMillimeters(committed));
+    setDraftValue(formatMillimeters(committed, 2, stepAllowed));
   };
 
   const commitSliderValue = (nextVal: number) => {
     onChange(nextVal);
-    setDraftValue(formatMillimeters(nextVal));
+    setDraftValue(formatMillimeters(nextVal, 2, stepAllowed));
   };
 
   const fineScale = hasAllowedValues
@@ -244,7 +244,7 @@ function RangeControl({
                     resolvedAllowedValues!.length - 1
                   );
                   const nextValue = resolvedAllowedValues![nextIndex];
-                  setDraftValue(formatMillimeters(nextValue));
+                  setDraftValue(formatMillimeters(nextValue, 2, stepAllowed));
                   onChange(nextValue);
                 } else {
                   const parsed = Number(draftValue.trim().replace(',', '.'));
@@ -255,7 +255,7 @@ function RangeControl({
                     max,
                     stepAllowed
                   );
-                  setDraftValue(formatMillimeters(nextValue));
+                  setDraftValue(formatMillimeters(nextValue, 2, stepAllowed));
                   onChange(nextValue);
                 }
               } else if (e.key === 'Enter') {
@@ -264,7 +264,7 @@ function RangeControl({
                 e.currentTarget.blur();
               } else if (e.key === 'Escape') {
                 e.preventDefault();
-                setDraftValue(mixed ? '' : formatMillimeters(effectiveValue));
+                setDraftValue(mixed ? '' : formatMillimeters(effectiveValue, 2, stepAllowed));
                 e.currentTarget.blur();
               }
             }}

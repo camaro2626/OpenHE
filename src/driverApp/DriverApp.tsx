@@ -45,7 +45,7 @@ import {
   DriverStreamPage
 } from './PerformancePages';
 import { registerDriverBoard } from './boardModel';
-import { setExtraKeyLabels } from '../app/helpers';
+import { setDisplayStepMm, setExtraKeyLabels } from '../app/helpers';
 import { useOpenAulaPerformance } from './usePerformance';
 import { useDriverHall } from './useDriverHall';
 import { keyIdOf } from './boardModel';
@@ -101,9 +101,10 @@ export function DriverApp({ driver }: { driver: KeyboardDriver }) {
   const model = useMemo(() => {
     const id = registerDriverBoard(driver);
     setExtraKeyLabels(new Map(driver.layout.keys.map(k => [keyIdOf(k.index), k.label])));
+    setDisplayStepMm(driver.capabilities.travelStepMm);
     return id;
   }, [driver]);
-  const perf = useOpenAulaPerformance(model, actuation);
+  const perf = useOpenAulaPerformance(model, actuation, caps.travelStepMm);
   const sw = useSwitchSetup(driver, model);
   const hall = useDriverHall(driver, i => actuation.draft?.[i]?.actuationMm);
 

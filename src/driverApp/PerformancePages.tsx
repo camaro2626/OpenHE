@@ -314,7 +314,8 @@ export function DriverActuationPage(props: Props & { hall: Hall; sw?: SwitchSetu
                 onChange: perf.setReleaseForSelection,
                 min: Math.max(driver.capabilities.travelStepMm, 0.1),
                 max: driver.capabilities.ranges?.actuation?.max ?? driver.capabilities.travelMm,
-                step: Math.max(driver.capabilities.travelStepMm, 0.01),
+                step:
+                  driver.capabilities.travelStepMm > 0 ? driver.capabilities.travelStepMm : 0.01,
                 rapidTriggerOn: perf.rapidTrigger && !perf.rapidTriggerMixed
               }
             : undefined

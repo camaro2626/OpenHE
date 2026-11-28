@@ -37,17 +37,17 @@ function VerticalRangeControl({
       ? { height: `${pct}%`, bottom: 0, top: 'auto' }
       : { height: `${pct}%`, top: 0, bottom: 'auto' };
   const [draftValue, setDraftValue] = useState(() =>
-    mixed ? '' : formatMillimeters(effectiveValue)
+    mixed ? '' : formatMillimeters(effectiveValue, 2, step)
   );
   const meterTrackRef = useRef<HTMLSpanElement | null>(null);
 
   useEffect(() => {
-    setDraftValue(mixed ? '' : formatMillimeters(effectiveValue));
-  }, [effectiveValue, mixed]);
+    setDraftValue(mixed ? '' : formatMillimeters(effectiveValue, 2, step));
+  }, [effectiveValue, mixed, step]);
 
   const commitSliderValue = (nextVal: number) => {
     onChange(nextVal);
-    setDraftValue(formatMillimeters(nextVal));
+    setDraftValue(formatMillimeters(nextVal, 2, step));
   };
 
   const fineScale = { kind: 'continuous' as const, min, max, step: effectiveStep };
@@ -81,12 +81,12 @@ function VerticalRangeControl({
     const normalized = draftValue.trim().replace(',', '.');
     const parsed = Number(normalized);
     if (!normalized || Number.isNaN(parsed)) {
-      setDraftValue(mixed ? '' : formatMillimeters(effectiveValue));
+      setDraftValue(mixed ? '' : formatMillimeters(effectiveValue, 2, step));
       return;
     }
     const committed = snapToStep(parsed, min, max, effectiveStep);
     onChange(committed);
-    setDraftValue(formatMillimeters(committed));
+    setDraftValue(formatMillimeters(committed, 2, step));
   };
 
   const isWideValue = draftValue.length >= 5;
@@ -143,7 +143,7 @@ function VerticalRangeControl({
                   max,
                   effectiveStep
                 );
-                setDraftValue(formatMillimeters(nextValue));
+                setDraftValue(formatMillimeters(nextValue, 2, step));
                 onChange(nextValue);
               } else if (e.key === 'Enter') {
                 e.preventDefault();
@@ -151,7 +151,7 @@ function VerticalRangeControl({
                 e.currentTarget.blur();
               } else if (e.key === 'Escape') {
                 e.preventDefault();
-                setDraftValue(mixed ? '' : formatMillimeters(effectiveValue));
+                setDraftValue(mixed ? '' : formatMillimeters(effectiveValue, 2, step));
                 e.currentTarget.blur();
               }
             }}
